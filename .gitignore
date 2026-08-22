@@ -1,0 +1,24 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local environment files, including templates and credentials.
+.env*
+
+# Local agent/tooling state.
+.agents/
+.codex/
+
+# Supabase database setup is kept local for now
+supabase/
+.supabase/
+
+# Logs and operating-system files
+*.log
+.DS_Store

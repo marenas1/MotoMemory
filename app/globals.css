@@ -1,0 +1,384 @@
+:root {
+  color-scheme: dark;
+  --color-canvas: #0b0f10;
+  --color-panel: #141a1c;
+  --color-panel-raised: #1b2224;
+  --color-border: #30383a;
+  --color-border-soft: #242d2f;
+  --color-text: #f3eadb;
+  --color-muted: #a9aaa3;
+  --color-faint: #747c78;
+  --color-amber: #f0a12b;
+  --color-amber-bright: #ffb23d;
+  --color-amber-dark: #8e5913;
+  --color-success: #a9c46c;
+  --color-danger: #e8755f;
+  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-text);
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  min-width: 320px;
+  margin: 0;
+  background:
+    radial-gradient(circle at 70% -10%, rgb(68 78 78 / 18%), transparent 32rem),
+    var(--color-canvas);
+  color: var(--color-text);
+}
+
+button, input { font: inherit; }
+button { cursor: pointer; }
+button:disabled, input:disabled { cursor: not-allowed; opacity: 0.62; }
+
+a { color: inherit; text-decoration: none; }
+
+h1, h2, h3, p, dl, dd { margin-top: 0; }
+h1, h2, h3 { color: var(--color-text); }
+h1, h2, h3, strong { letter-spacing: -0.035em; }
+p { line-height: 1.5; }
+
+.dashboard-shell {
+  display: grid;
+  grid-template-columns: 15.25rem minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.side-rail {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 2rem 1.25rem 1.25rem;
+  border-right: 1px solid var(--color-border);
+  background: rgb(10 15 16 / 84%);
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0 0.35rem 2.75rem;
+  color: var(--color-text);
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.brand-symbol {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border: 1px solid var(--color-amber);
+  border-radius: 50%;
+  color: var(--color-amber);
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+}
+
+.brand-logo {
+  display: block;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  border: 1px solid rgb(240 161 43 / 55%);
+  border-radius: 0.55rem;
+  object-fit: cover;
+}
+
+.primary-nav { display: grid; gap: 0.45rem; }
+
+.nav-item {
+  display: grid;
+  grid-template-columns: 1.6rem 1fr auto;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 2.9rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 0.55rem;
+  color: var(--color-muted);
+  font-size: 0.92rem;
+}
+
+.nav-item-active {
+  border-color: rgb(240 161 43 / 28%);
+  background: linear-gradient(100deg, rgb(240 161 43 / 20%), rgb(240 161 43 / 7%));
+  color: var(--color-amber-bright);
+}
+
+.nav-icon { color: currentColor; font-size: 1.15rem; line-height: 1; text-align: center; }
+.nav-item-deferred { cursor: default; opacity: 0.73; }
+.nav-item-deferred small { color: var(--color-faint); font-size: 0.62rem; letter-spacing: 0.04em; }
+
+.rail-spacer { flex: 1; min-height: 3rem; }
+
+.dashboard-content {
+  --content-gutter: clamp(1.25rem, 3.4vw, 4rem);
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  width: min(100%, 106rem);
+  margin: 0 auto;
+  padding: 2.3rem var(--content-gutter) 2rem;
+}
+
+.dashboard-stage {
+  position: relative;
+  margin: -2.3rem calc(-1 * var(--content-gutter)) 0;
+  padding: 2.3rem var(--content-gutter) 2rem;
+  overflow: hidden;
+  border-bottom: 1px solid rgb(240 161 43 / 20%);
+  background:
+    linear-gradient(90deg, rgb(8 12 13 / 42%), rgb(8 12 13 / 14%) 46%, transparent),
+    linear-gradient(0deg, rgb(8 12 13 / 50%), transparent 60%),
+    url("/images/gs750-garage-background.png") center / cover no-repeat;
+}
+
+.dashboard-stage::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 8rem;
+  background: linear-gradient(0deg, rgb(11 15 16 / 68%), transparent);
+  content: "";
+  pointer-events: none;
+}
+
+.dashboard-stage > * { position: relative; z-index: 1; }
+
+.dashboard-stage .topbar { margin-bottom: 1.7rem; }
+
+.dashboard-stage .hero-grid { position: relative; z-index: 1; }
+
+.dashboard-stage .mileage-panel {
+  background: linear-gradient(145deg, rgb(20 26 28 / 78%), rgb(10 15 16 / 91%));
+  backdrop-filter: blur(2px);
+}
+
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 1.7rem;
+}
+
+.topbar h1 { margin-bottom: 0.25rem; font-size: clamp(2rem, 4vw, 3.35rem); line-height: 0.98; }
+.topbar-subtitle { margin-bottom: 0; color: var(--color-muted); font-size: 1.05rem; }
+.scope-label { flex: 0 0 auto; padding: 0.75rem 1rem; border: 1px solid rgb(240 161 43 / 25%); border-radius: 999px; color: var(--color-text); font-size: 0.73rem; letter-spacing: 0.14em; text-transform: uppercase; }
+.scope-label b { padding: 0 0.25rem; color: var(--color-amber); }
+
+.eyebrow, .value-label {
+  margin-bottom: 0.48rem;
+  color: var(--color-amber);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.panel {
+  border: 1px solid var(--color-border);
+  border-radius: 0.9rem;
+  background: linear-gradient(145deg, rgb(27 34 36 / 76%), rgb(16 22 24 / 96%));
+  box-shadow: 0 1.5rem 3rem rgb(0 0 0 / 16%);
+}
+
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(20rem, 0.72fr); gap: 1rem; }
+
+.hero-panel {
+  position: relative;
+  display: grid;
+  min-height: 38rem;
+  grid-template-rows: auto 1fr auto;
+  overflow: hidden;
+  padding: 2.1rem 2.2rem 1.15rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.hero-panel::after {
+  display: none;
+}
+
+.hero-copy { position: relative; z-index: 1; max-width: 52%; margin-left: 0; text-align: left; text-shadow: 0 0.2rem 1rem rgb(0 0 0 / 72%); }
+.hero-copy h2 { display: grid; gap: 0.05rem; margin-bottom: 1rem; font-size: clamp(2rem, 4.3vw, 4.2rem); line-height: 0.91; }
+.hero-copy h2 span { color: var(--color-amber); font-size: 0.47em; letter-spacing: -0.02em; }
+.hero-copy h2 strong { color: var(--color-text); font-size: 1em; }
+.spec-tags { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 0.55rem; }
+.spec-tags span { padding: 0.4rem 0.65rem; border: 1px solid rgb(240 161 43 / 48%); border-radius: 999px; color: var(--color-amber-bright); font-size: 0.67rem; letter-spacing: 0.08em; text-transform: uppercase; }
+
+.hero-footer { position: relative; z-index: 1; display: flex; justify-content: center; gap: 0.8rem; padding-top: 0.6rem; color: var(--color-amber); font-size: 0.68rem; letter-spacing: 0.16em; text-transform: uppercase; }
+.hero-footer i { width: 0.7rem; height: 0.7rem; border: 1px solid var(--color-amber); transform: rotate(45deg); }
+
+.mileage-panel { display: flex; flex-direction: column; min-height: 38rem; padding: 2rem; }
+.panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.3rem; }
+.panel-heading h2 { margin-bottom: 0; font-size: clamp(1.2rem, 2vw, 1.65rem); line-height: 1.05; }
+.compact-heading { align-items: flex-end; }
+.compact-heading h2 { margin-bottom: 0; color: var(--color-amber-bright); font-size: clamp(3.3rem, 6vw, 5.5rem); line-height: 0.84; letter-spacing: -0.075em; }
+.mileage-unit { padding-bottom: 0.15rem; color: var(--color-text); font-size: 1rem; }
+.panel-icon { display: grid; width: 2rem; height: 2rem; place-items: center; border: 1px solid rgb(240 161 43 / 38%); border-radius: 50%; color: var(--color-amber); font-size: 0.95rem; }
+.mileage-rule { height: 2px; margin: 0.2rem 0 1.5rem; background: var(--color-border-soft); }
+.mileage-rule span { display: block; width: 24%; height: 100%; background: var(--color-amber); box-shadow: 0 0 1rem rgb(240 161 43 / 50%); }
+.mileage-meta { display: grid; gap: 1rem; margin: 0; }
+.mileage-meta div { display: grid; gap: 0.25rem; }
+.mileage-meta dt { color: var(--color-faint); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.mileage-meta dd { margin: 0; color: var(--color-muted); font-size: 0.85rem; }
+.text-action { display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; width: 100%; margin-top: auto; padding: 0.9rem 0; border: 0; border-top: 1px solid var(--color-border-soft); background: transparent; color: var(--color-amber-bright); font-size: 0.82rem; text-align: left; }
+.text-action span { font-size: 1.2rem; }
+
+.content-grid { display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(20rem, 0.82fr); gap: 1rem; margin-top: 1rem; }
+.maintenance-panel, .update-panel { padding: 1.65rem; }
+.next-maintenance-card { padding: 1.15rem; border: 1px solid rgb(240 161 43 / 30%); border-radius: 0.65rem; background: linear-gradient(145deg, rgb(240 161 43 / 9%), rgb(17 23 25 / 45%)); }
+.maintenance-card-topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.card-kicker { margin-bottom: 0.35rem; color: var(--color-faint); font-size: 0.68rem; letter-spacing: 0.13em; text-transform: uppercase; }
+.next-maintenance-card h3 { margin-bottom: 0; font-size: 1.15rem; }
+.maintenance-source { margin: 0.8rem 0 1.15rem; color: var(--color-muted); font-size: 0.78rem; }
+.maintenance-targets { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.maintenance-targets div { display: grid; gap: 0.25rem; }
+.maintenance-targets span { color: var(--color-faint); font-size: 0.67rem; letter-spacing: 0.11em; text-transform: uppercase; }
+.maintenance-targets strong { color: var(--color-text); font-size: 1.45rem; font-weight: 500; letter-spacing: -0.04em; }
+.provisional-note { margin: 1rem 0 0; color: var(--color-amber); font-size: 0.75rem; }
+.reminders-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 1.45rem 0 0.55rem; }
+.reminders-heading .eyebrow { margin-bottom: 0; }
+.reminders-heading > span { color: var(--color-faint); font-size: 0.72rem; }
+.reminder-list { display: grid; gap: 0; border-top: 1px solid var(--color-border-soft); }
+.reminder-item { display: grid; grid-template-columns: 7rem minmax(0, 1fr) auto; align-items: center; gap: 0.85rem; padding: 0.78rem 0; border-bottom: 1px solid var(--color-border-soft); }
+.reminder-item > div { display: grid; gap: 0.25rem; }
+.reminder-item strong { color: var(--color-text); font-size: 0.9rem; font-weight: 500; }
+.reminder-item div span { color: var(--color-faint); font-size: 0.65rem; }
+.reminder-item p { margin: 0; color: var(--color-muted); font-size: 0.8rem; }
+
+.status-pill { display: inline-flex; width: max-content; align-items: center; padding: 0.34rem 0.52rem; border: 1px solid transparent; border-radius: 999px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; }
+.status-upcoming { border-color: rgb(169 196 108 / 38%); background: rgb(169 196 108 / 9%); color: var(--color-success); }
+.status-due { border-color: rgb(240 161 43 / 44%); background: rgb(240 161 43 / 12%); color: var(--color-amber-bright); }
+.status-unknown { border-color: var(--color-border); background: rgb(169 170 163 / 8%); color: var(--color-muted); }
+
+.update-panel { display: flex; flex-direction: column; }
+.mileage-form { display: grid; gap: 0.65rem; }
+.mileage-form-controls { display: flex; align-items: center; gap: 0.5rem; }
+.mileage-form-controls input { min-width: 0; width: 100%; padding: 0.82rem 0.9rem; border: 1px solid var(--color-border); border-radius: 0.45rem; outline: none; background: #0e1416; color: var(--color-text); }
+.mileage-form-controls input:focus { border-color: var(--color-amber); box-shadow: 0 0 0 3px rgb(240 161 43 / 18%); }
+.mileage-form-controls > span { color: var(--color-muted); }
+.field-help { margin: 0; color: var(--color-faint); font-size: 0.74rem; }
+.button { border-radius: 0.45rem; font-weight: 700; white-space: nowrap; }
+.button-primary { padding: 0.82rem 1rem; border: 1px solid var(--color-amber-dark); background: linear-gradient(145deg, var(--color-amber-bright), var(--color-amber)); color: #19130b; }
+.button-outline { padding: 0.7rem 0.75rem; border: 1px solid rgb(240 161 43 / 38%); background: transparent; color: var(--color-amber-bright); }
+.button:hover:not(:disabled), .action-tile:hover:not(:disabled) { border-color: var(--color-amber); filter: brightness(1.08); }
+.state-feedback { margin: 0.9rem 0 0; padding: 0.72rem 0.85rem; border: 1px solid transparent; border-radius: 0.45rem; font-size: 0.78rem; }
+.state-feedback-info { border-color: rgb(240 161 43 / 25%); background: rgb(240 161 43 / 8%); color: var(--color-amber-bright); }
+.state-feedback-success { border-color: rgb(169 196 108 / 30%); background: rgb(169 196 108 / 8%); color: var(--color-success); }
+.state-feedback-error { border-color: rgb(232 117 95 / 34%); background: rgb(232 117 95 / 8%); color: var(--color-danger); }
+
+.quick-actions { margin-top: auto; padding-top: 2rem; }
+.quick-actions-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem; }
+.quick-actions-heading .eyebrow { margin-bottom: 0; }
+.quick-actions-note { color: var(--color-faint); font-size: 0.67rem; text-transform: uppercase; }
+.quick-actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; }
+.action-tile { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 0.45rem; background: rgb(20 26 28 / 72%); color: var(--color-text); font-size: 0.75rem; text-align: left; }
+.action-tile span { color: var(--color-amber); font-size: 1rem; }
+
+.dashboard-footer { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.65rem 1rem; margin-top: auto; padding: 2rem 0 0.5rem; color: var(--color-faint); font-size: 0.7rem; letter-spacing: 0.04em; }
+.dashboard-footer strong { color: var(--color-amber); font-weight: 500; }
+
+/* Keep the full desktop dashboard visible without making the motorcycle feel cramped. */
+@media (min-width: 69rem) {
+  .dashboard-content { padding-top: 1.35rem; padding-bottom: 1rem; }
+  .dashboard-stage { margin-top: -1.35rem; padding-top: 1.35rem; padding-bottom: 1rem; }
+  .dashboard-stage .topbar { margin-bottom: 0.85rem; }
+  .topbar h1 { font-size: clamp(2rem, 3vw, 3rem); }
+  .hero-panel, .mileage-panel { min-height: clamp(22rem, 48vh, 38rem); }
+  .hero-panel { padding: 1.55rem 1.8rem 0.8rem; }
+  .mileage-panel { padding: 1.5rem; }
+  .content-grid { margin-top: auto; margin-bottom: auto; }
+  .maintenance-panel, .update-panel { padding: 1.2rem; }
+  .next-maintenance-card { padding: 0.9rem; }
+  .maintenance-source { margin: 0.6rem 0 0.8rem; }
+  .maintenance-targets strong { font-size: 1.2rem; }
+  .reminders-heading { margin: 0.9rem 0 0.4rem; }
+  .reminder-item { padding: 0.55rem 0; }
+  .quick-actions { padding-top: 1rem; }
+  .dashboard-footer { margin-top: 0; padding-top: 0.8rem; }
+}
+
+.empty-state { margin: 0; color: var(--color-muted); font-size: 0.85rem; }
+
+/* Disconnected-state styles retain the same visual language as the dashboard. */
+.app-shell { display: grid; gap: 1.5rem; min-height: 100vh; padding: 3rem clamp(1.25rem, 5vw, 5rem); }
+.app-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--color-border); }
+.app-header h1 { max-width: 42rem; margin-bottom: 0.75rem; font-size: clamp(2rem, 5vw, 4rem); line-height: 1; }
+.intro-copy, .muted-copy { color: var(--color-muted); }
+.empty-state-card { display: grid; gap: 1rem; max-width: 50rem; padding: 1.75rem; border: 1px solid var(--color-border); border-radius: 0.9rem; background: var(--color-panel); }
+.empty-state-card h2 { margin-bottom: 0; font-size: 1.5rem; }
+.empty-state-card p { max-width: 42rem; margin-bottom: 0; color: var(--color-muted); }
+.empty-state-card .motorcycle-visual { width: 9rem; }
+.motorcycle-visual { display: grid; min-height: 9rem; place-items: center; border: 1px dashed var(--color-border); border-radius: 0.75rem; background: var(--color-panel-raised); font-size: 4rem; }
+.system-state { display: grid; min-height: 100vh; align-content: center; justify-items: start; gap: 0.35rem; max-width: 42rem; margin: 0 auto; padding: 2rem; }
+.system-state p { margin-bottom: 0; color: var(--color-muted); }
+.system-state p:first-of-type { color: var(--color-text); font-size: 1.5rem; }
+.system-state button { margin-top: 1rem; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+:focus-visible { outline: 3px solid var(--color-amber-bright); outline-offset: 3px; }
+
+@media (max-width: 68rem) {
+  .dashboard-shell { grid-template-columns: 12.75rem minmax(0, 1fr); }
+  .side-rail { padding-inline: 0.85rem; }
+  .brand-lockup { padding-bottom: 2rem; font-size: 0.9rem; }
+  .nav-item { grid-template-columns: 1.25rem 1fr; padding-inline: 0.55rem; }
+  .nav-item-deferred small { display: none; }
+  .content-grid { grid-template-columns: 1fr; }
+  .maintenance-panel { min-width: 0; }
+}
+
+@media (max-width: 54rem) {
+  .dashboard-shell { display: block; }
+  .side-rail { position: static; display: grid; grid-template-columns: auto 1fr; align-items: center; min-height: auto; padding: 1rem; border-right: 0; border-bottom: 1px solid var(--color-border); }
+  .brand-lockup { padding: 0; }
+  .primary-nav { display: flex; justify-content: flex-end; gap: 0.35rem; }
+  .nav-item { display: grid; width: 2.7rem; min-height: 2.7rem; grid-template-columns: 1fr; padding: 0.5rem; font-size: 0; }
+  .nav-item-active { font-size: 0; }
+  .nav-item .nav-icon { font-size: 1.1rem; }
+  .nav-item-deferred { display: none; }
+  .rail-spacer { display: none; }
+  .dashboard-content { --content-gutter: 1rem; padding-top: 1.6rem; }
+  .dashboard-stage { margin-top: -1.6rem; padding-top: 1.6rem; }
+  .hero-grid { grid-template-columns: 1fr; }
+  .hero-panel, .mileage-panel { min-height: auto; }
+  .mileage-panel { min-height: 19rem; }
+  .hero-panel { min-height: 34rem; }
+}
+
+@media (max-width: 38rem) {
+  .dashboard-content { --content-gutter: 0.85rem; padding-inline: var(--content-gutter); }
+  .topbar { display: grid; gap: 1rem; }
+  .scope-label { width: max-content; }
+  .hero-panel, .mileage-panel, .maintenance-panel, .update-panel { padding: 1.2rem; }
+  .hero-panel { min-height: 29rem; }
+  .hero-copy { max-width: 100%; margin-left: 0; text-align: left; }
+  .hero-copy h2 { font-size: clamp(2.1rem, 15vw, 3.6rem); }
+  .spec-tags { justify-content: flex-start; }
+  .mileage-form-controls { flex-wrap: wrap; }
+  .mileage-form-controls input { flex: 1 1 10rem; }
+  .mileage-form-controls .button { flex: 1 1 100%; }
+  .reminder-item { grid-template-columns: 1fr auto; }
+  .reminder-item p { grid-column: 1 / -1; grid-row: 2; }
+  .quick-actions-grid { grid-template-columns: 1fr; }
+  .dashboard-footer { justify-content: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}

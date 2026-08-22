@@ -1,0 +1,39 @@
+{
+  "name": "motomemory",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
+    "test:unit": "vitest run tests/unit --passWithNoTests",
+    "test:integration": "vitest run tests/integration --passWithNoTests",
+    "test:e2e": "playwright test --pass-with-no-tests"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "packageManager": "npm@11.4.2",
+  "dependencies": {
+    "next": "16.3.1",
+    "pg": "^8.23.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.0",
+    "@types/node": "24.3.0",
+    "@types/pg": "^8.23.1",
+    "@types/react": "19.1.10",
+    "@types/react-dom": "19.1.7",
+    "eslint": "9.35.0",
+    "eslint-config-next": "16.3.1",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  }
+}
