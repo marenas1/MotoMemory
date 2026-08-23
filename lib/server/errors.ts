@@ -6,7 +6,14 @@ export type AppErrorCode =
   | "INVALID_CONFIGURATION"
   | "DATABASE_UNAVAILABLE"
   | "UPDATE_FAILED"
-  | "STALE_STATE";
+  | "STALE_STATE"
+  | "INVALID_MANUAL"
+  | "MANUAL_NOT_FOUND"
+  | "MANUAL_DUPLICATE"
+  | "MANUAL_ALREADY_EXISTS"
+  | "MANUAL_PROCESSING"
+  | "STORAGE_UNAVAILABLE"
+  | "STORAGE_CLEANUP_FAILED";
 
 export class AppError extends Error {
   readonly code: AppErrorCode;

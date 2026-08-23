@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
 
 import { MaintenanceOutlook } from "@/components/maintenance-outlook";
 import { MileageForm } from "@/components/mileage-form";
+import { MotorcycleNavigation } from "@/components/motorcycle-navigation";
 import { StateFeedback } from "@/components/state-feedback";
 import type { MotorcycleOverview } from "@/lib/domain/types";
 
@@ -81,44 +81,7 @@ export function MotorcycleMainView({
 
   return (
     <main className="dashboard-shell" id="dashboard">
-      <aside className="side-rail" aria-label="MotoMemory navigation">
-        <div className="brand-lockup">
-          <Image
-            className="brand-logo"
-            src="/images/motomemory-logo.png"
-            alt=""
-            width={42}
-            height={42}
-            priority
-          />
-          <span className="brand-name">MotoMemory</span>
-        </div>
-
-        <nav className="primary-nav" aria-label="Primary navigation">
-          <a className="nav-item nav-item-active" href="#dashboard" aria-current="page">
-            <span className="nav-icon" aria-hidden="true">⌂</span>
-            Dashboard
-          </a>
-          <span className="nav-item nav-item-deferred" aria-disabled="true" title="Planned for a later phase">
-            <span className="nav-icon" aria-hidden="true">⚒</span>
-            Maintenance
-            <small>Later phase</small>
-          </span>
-          <span className="nav-item nav-item-deferred" aria-disabled="true" title="Planned for a later phase">
-            <span className="nav-icon" aria-hidden="true">◷</span>
-            History
-            <small>Later phase</small>
-          </span>
-          <span className="nav-item nav-item-deferred" aria-disabled="true" title="Planned for a later phase">
-            <span className="nav-icon" aria-hidden="true">▤</span>
-            Manual
-            <small>Phase 2</small>
-          </span>
-        </nav>
-
-        <div className="rail-spacer" />
-
-      </aside>
+      <MotorcycleNavigation active="dashboard" />
 
       <div className="dashboard-content">
         <div className="dashboard-stage">

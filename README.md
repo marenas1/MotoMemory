@@ -9,7 +9,8 @@ The current Phase 1 state is intentionally small:
 - Provisional maintenance cadence: one general check every 1,000 mi.
 - Temporary motorcycle visual: 🏍️.
 - Manual mileage updates, including lower corrections.
-- No account, user profile, authentication, mobile client, GPS, manual ingestion, or AI.
+- A private Phase 2 manual workspace with no committed manual PDF.
+- No account, user profile, authentication, mobile client, GPS, service history, or selected answer model.
 
 ## Requirements
 
@@ -28,12 +29,19 @@ cp .env.example .env.local
 
 Set `DATABASE_URL` in `.env.local` to the server-side PostgreSQL connection string for the private Supabase project. Do not add a `NEXT_PUBLIC_` prefix and do not commit `.env.local`.
 
+For Phase 2 private manual storage, also set `SUPABASE_PROJECT_URL` and the server-only `SUPABASE_SERVICE_ROLE_KEY`. Keep the service-role key out of browser code and do not commit it.
+
+Manual questions default to a fail-closed, provider-unavailable state until an answer provider is selected and configured. Evidence search and private PDF browsing do not require an answer-model credential.
+
 Apply the versioned migrations in order using the Supabase SQL Editor or Supabase CLI:
 
 ```text
 supabase/migrations/001_phase1_schema.sql
 supabase/migrations/002_phase1_seed.sql
 supabase/migrations/003_phase1_mileage_function.sql
+supabase/migrations/004_phase2_manual_schema.sql
+supabase/migrations/005_phase2_ocr_ingestion.sql
+supabase/migrations/006_phase2_maintenance_facts.sql
 ```
 
 Then start the app:
@@ -46,6 +54,8 @@ Open [http://localhost:3000](http://localhost:3000). If `DATABASE_URL` is absent
 
 More environment and database guidance is in [docs/LOCAL_DEVELOPMENT.md](./docs/LOCAL_DEVELOPMENT.md).
 
+Phase 2 hardening and owner acceptance are documented in the [Phase 2 completion and handoff note](./docs/PHASE_2_COMPLETION_HANDOFF.md). The real 67-page manual and its measured acceptance record must remain outside Git; use the [acceptance record template](./docs/PHASE_2_ACCEPTANCE_RECORD_TEMPLATE.md).
+
 ## Scripts
 
 | Command | Purpose |
@@ -57,7 +67,11 @@ More environment and database guidance is in [docs/LOCAL_DEVELOPMENT.md](./docs/
 | `npm run test:unit` | Run pure mileage and maintenance tests |
 | `npm run test:integration` | Run safe repository-boundary tests |
 | `npm run test:e2e` | Run local Playwright smoke tests |
+| `npm run manual:capability -- /absolute/path/to/manual.pdf` | Render and OCR a small sample of a private manual |
+| `npm run manual:ocr:acceptance -- /absolute/path/to/manual.pdf --all-pages` | Render and OCR every page of the private acceptance PDF without storing it in Git |
 | `npm test` | Run unit, integration, and browser tests |
+
+For a clean Phase 2 validation run, run the commands serially. Playwright needs a local loopback port and should not be started in parallel with lint or the production build. Set `PLAYWRIGHT_PORT` if port 3000 is already occupied.
 
 ## Phase 1 behavior
 

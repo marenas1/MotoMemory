@@ -1,6 +1,6 @@
 # MotoMemory — Concept of Operations
 
-This document is the operational baseline for MotoMemory. It describes the problem the product solves, how a rider interacts with it as the product grows, and what each phase must prove before the next phase begins. It intentionally stays above detailed requirements, architecture, and implementation tasks.
+This document is the operational baseline for MotoMemory. It describes the problem the product solves, how a rider interacts with it as the product grows, and what each phase must prove before the next phase begins. It intentionally stays above detailed requirements, architecture, and implementation tasks. The detailed Phase 2 concept is documented in [PHASE_2_CONOPS.md](./PHASE_2_CONOPS.md).
 
 ## Table of Contents
 
@@ -123,7 +123,7 @@ The first phase should let the owner understand the configured motorcycle's curr
 
 Phase 2 lets the rider supply the service manual for the motorcycle. MotoMemory processes the manual into searchable knowledge, identifies maintenance intervals and procedures, and uses relevant manual sections when answering questions. Answers show where the information came from so the rider can inspect the source instead of treating the model as an unsupported authority.
 
-This phase changes the product from a general maintenance tracker into a motorcycle-specific assistant. The manual is the source of truth for model-specific advice; the assistant's job is to find and explain relevant material, not to replace the manual.
+This phase changes the product from a general maintenance tracker into a motorcycle-specific assistant. The Manual item in the left rail becomes a working page that displays the actual service-manual PDF, supports page navigation, and lets a rider move from a cited answer to the source page. The manual is the source of truth for model-specific advice; the assistant's job is to find and explain relevant material, not to replace the manual.
 
 ### Why This Approach
 
@@ -154,6 +154,7 @@ Failure modes:
 ### Implementation Touch Points
 
 - Manual intake experience: upload, association, processing status, and source inspection.
+- Manual workspace and PDF viewer: turns the left-rail Manual item into a page for browsing the original document and opening cited pages.
 - Document processing capability: extraction, chunking, metadata, and searchable representations.
 - Question-answering capability: relevant passage retrieval, answer generation, and citations.
 - Maintenance schedule projection: consumes intervals identified from the manual when available.
@@ -424,6 +425,7 @@ The principal relationships are: a motorcycle has one active manual and many man
 
 ### Phase 1: Next.js Web App + Manual Mileage
 
+- Status: Complete. See [PHASE_1_COMPLETION.md](./PHASE_1_COMPLETION.md).
 - Objective: Establish a persistent state for one 1981 Suzuki GS750 with a visible, manually controlled mileage value.
 - Deliverables:
   - Next.js web motorcycle view with fixed GS750 identity and 🏍️ visual placeholder.
@@ -437,11 +439,13 @@ The principal relationships are: a motorcycle has one active manual and many man
 
 - Objective: Make maintenance knowledge specific to the motorcycle by ingesting and retrieving its service manual.
 - Deliverables:
-  - Manual upload and processing status.
-  - Searchable manual sections with source metadata.
-  - Manual-backed answers and maintenance interval references.
+  - Working Manual navigation from the left rail into a dedicated manual workspace.
+  - Upload-only intake for one active manual PDF and original PDF storage with a browser-native viewer and page navigation.
+  - Manual upload and processing status with retry and visible OCR page-failure states.
+  - Searchable, page-aware manual sections with source metadata.
+  - Manual-backed answers, citation-to-page navigation, and manual-derived maintenance intervals with source links and a later correction path.
 - Dependencies: Phase 1 motorcycle identity and storage scope.
-- Gate for Phase 3: A representative question set produces traceable answers whose cited passages support the response, and failed or ambiguous ingestion does not create uncited guidance. The evaluation corpus and evidence threshold must be recorded.
+- Gate for Phase 3: A representative question set produces traceable answers whose cited passages support the response, the original PDF viewer can open each cited page, and failed or ambiguous ingestion does not create uncited guidance. The evaluation corpus and evidence threshold must be recorded.
 
 ### Phase 3: Maintenance History
 

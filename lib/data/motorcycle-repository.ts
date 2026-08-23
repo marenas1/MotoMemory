@@ -8,6 +8,7 @@ import type {
   MotorcycleOverview,
   MotorcycleState,
 } from "@/lib/domain/types";
+import { buildManualCitationHref } from "@/lib/manual/manual-citations";
 import { AppError } from "@/lib/server/errors";
 
 export const MOTORCYCLE_ID = "gs750";
@@ -30,11 +31,19 @@ type MaintenanceRow = QueryResultRow & {
   id: string;
   motorcycle_id: string;
   name: string;
+  interval_value: string | null;
+  interval_unit: "mi" | "km" | null;
   interval_miles: string;
   due_window_miles: string;
   status: "active";
   source: string;
   notes: string | null;
+  source_manual_id: string | null;
+  source_page_start: number | null;
+  source_page_end: number | null;
+  source_printed_page_label: string | null;
+  origin: "ocr" | "rider_corrected" | null;
+  corrected_at: Date | null;
 };
 
 type UpdateRow = QueryResultRow & {
@@ -100,11 +109,24 @@ function mapMaintenance(row: MaintenanceRow): MaintenanceDefinition {
     id: row.id,
     motorcycleId: row.motorcycle_id,
     name: row.name,
+    intervalValue:
+      row.interval_value === null ? undefined : parseNumeric(row.interval_value),
+    intervalUnit: row.interval_unit ?? "mi",
     intervalMiles: parseNumeric(row.interval_miles),
     dueWindowMiles: parseNumeric(row.due_window_miles),
     status: row.status,
     source: row.source,
     notes: row.notes,
+    sourceManualId: row.source_manual_id,
+    sourcePageStart: row.source_page_start,
+    sourcePageEnd: row.source_page_end,
+    sourcePrintedPageLabel: row.source_printed_page_label,
+    origin: row.origin,
+    correctedAt: row.corrected_at?.toISOString() ?? null,
+    sourceHref:
+      row.source_manual_id && row.source_page_start
+        ? buildManualCitationHref(row.source_page_start, row.source_printed_page_label)
+        : null,
   };
 }
 
@@ -171,8 +193,10 @@ const postgresRepository: MotorcycleRepository = {
       }
 
       const maintenanceResult = await database.query<MaintenanceRow>(
-        `select id, motorcycle_id, name, interval_miles, due_window_miles,
-                status, source, notes
+        `select id, motorcycle_id, name, interval_value, interval_unit,
+                interval_miles, due_window_miles, status, source, notes,
+                source_manual_id, source_page_start, source_page_end,
+                source_printed_page_label, origin, corrected_at
            from public.maintenance_definitions
           where motorcycle_id = $1
             and status = 'active'

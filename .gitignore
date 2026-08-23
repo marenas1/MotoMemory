@@ -10,13 +10,23 @@ next-env.d.ts
 
 # Local environment files, including templates and credentials.
 .env*
+!.env.example
+
+# Private owner acceptance artifacts. Keep the real manual and its results
+# outside the repository even when running local OCR acceptance.
+local-acceptance/
+*.pdf
 
 # Local agent/tooling state.
 .agents/
 .codex/
 
-# Supabase database setup is kept local for now
-supabase/
+# Supabase local configuration is kept local, but versioned migrations are
+# part of the application source of truth.
+supabase/*
+!supabase/
+!supabase/migrations/
+!supabase/migrations/*.sql
 .supabase/
 
 # Logs and operating-system files

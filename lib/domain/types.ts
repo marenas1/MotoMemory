@@ -8,6 +8,10 @@
 
 export type MileageUnit = "mi";
 
+export type MaintenanceIntervalUnit = "mi" | "km";
+
+export type MaintenanceFactOrigin = "ocr" | "rider_corrected";
+
 export type MotorcycleVisualState = "emoji" | "image";
 
 export type MileageUpdateOrigin = "manual";
@@ -34,11 +38,21 @@ export interface MaintenanceDefinition {
   id: string;
   motorcycleId: string;
   name: string;
+  intervalValue?: number;
+  intervalUnit?: MaintenanceIntervalUnit;
   intervalMiles: number;
   dueWindowMiles: number;
   status: MaintenanceDefinitionStatus;
   source: string;
   notes: string | null;
+  sourceManualId?: string | null;
+  sourcePageStart?: number | null;
+  sourcePageEnd?: number | null;
+  sourcePrintedPageLabel?: string | null;
+  rawOcrContext?: string | null;
+  origin?: MaintenanceFactOrigin | null;
+  correctedAt?: string | null;
+  sourceHref?: string | null;
 }
 
 export interface MileageUpdate {
@@ -53,11 +67,18 @@ export interface MileageUpdate {
 export interface MaintenanceOutlookItem {
   definitionId: string;
   name: string;
+  intervalValue?: number | null;
+  intervalUnit?: MaintenanceIntervalUnit | null;
   intervalMiles: number | null;
   dueMileage: number | null;
   remainingMiles: number | null;
   status: MaintenanceOutlookStatus;
   source: string | null;
+  sourceManualId?: string | null;
+  sourcePageStart?: number | null;
+  sourcePageEnd?: number | null;
+  sourcePrintedPageLabel?: string | null;
+  sourceHref?: string | null;
 }
 
 export interface MotorcycleOverview {

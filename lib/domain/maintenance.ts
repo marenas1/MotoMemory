@@ -14,7 +14,14 @@ export function calculateMaintenanceOutlook(
   const base = {
     definitionId: definition.id,
     name: definition.name,
+    intervalValue: definition.intervalValue ?? definition.intervalMiles,
+    intervalUnit: definition.intervalUnit ?? "mi",
     source: definition.source,
+    sourceManualId: definition.sourceManualId ?? null,
+    sourcePageStart: definition.sourcePageStart ?? null,
+    sourcePageEnd: definition.sourcePageEnd ?? null,
+    sourcePrintedPageLabel: definition.sourcePrintedPageLabel ?? null,
+    sourceHref: definition.sourceHref ?? null,
   };
 
   if (

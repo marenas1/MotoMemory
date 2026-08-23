@@ -9,6 +9,12 @@ function formatSource(value: string | null): string {
   return value.replaceAll("_", " ");
 }
 
+function formatInterval(item: MaintenanceOutlookItem): string {
+  const value = item.intervalValue ?? item.intervalMiles;
+  const unit = item.intervalUnit ?? "mi";
+  return value === null ? "Unknown" : `${value.toLocaleString()} ${unit}`;
+}
+
 function formatStatus(value: MaintenanceOutlookItem["status"]): string {
   if (value === "due") return "Due now";
   if (value === "upcoming") return "Upcoming";
@@ -47,7 +53,8 @@ export function MaintenanceOutlook({
               </span>
             </div>
             <p className="maintenance-source">
-              Every {formatMiles(nextItem.intervalMiles)} <span aria-hidden="true">·</span> Source: {formatSource(nextItem.source)}
+              Every {formatInterval(nextItem)} <span aria-hidden="true">·</span> Source: {formatSource(nextItem.source)}
+              {nextItem.sourceHref ? <> <span aria-hidden="true">·</span> <a href={nextItem.sourceHref}>Open source</a></> : null}
             </p>
             <div className="maintenance-targets">
               <div>

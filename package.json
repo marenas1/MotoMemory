@@ -11,7 +11,9 @@
     "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
     "test:unit": "vitest run tests/unit --passWithNoTests",
     "test:integration": "vitest run tests/integration --passWithNoTests",
-    "test:e2e": "playwright test --pass-with-no-tests"
+    "test:e2e": "playwright test --pass-with-no-tests",
+    "manual:capability": "node scripts/manual-capability-spike.mjs",
+    "manual:ocr:acceptance": "node scripts/manual-capability-spike.mjs"
   },
   "engines": {
     "node": ">=20.9.0"
