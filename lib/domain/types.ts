@@ -18,7 +18,46 @@ export type MileageUpdateOrigin = "manual";
 
 export type MaintenanceDefinitionStatus = "active";
 
-export type MaintenanceOutlookStatus = "upcoming" | "due" | "unknown";
+export type MaintenanceOutlookStatus =
+  | "not_recorded"
+  | "upcoming"
+  | "due"
+  | "overdue"
+  | "unknown";
+
+export interface MaintenanceRecord {
+  id: string;
+  motorcycleId: string;
+  definitionId: string | null;
+  serviceType: string;
+  performedMileage: number;
+  performedAt: string | null;
+  notes: string | null;
+  parts: string[] | null;
+  cost: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateMaintenanceRecordInput {
+  definitionId?: string | null;
+  serviceType: string;
+  performedMileage: number | string;
+  performedAt?: string | null;
+  notes?: string | null;
+  parts?: string[] | null;
+  cost?: number | string | null;
+}
+
+export interface UpdateMaintenanceRecordInput {
+  definitionId?: string | null;
+  serviceType?: string;
+  performedMileage?: number | string;
+  performedAt?: string | null;
+  notes?: string | null;
+  parts?: string[] | null;
+  cost?: number | string | null;
+}
 
 export interface MotorcycleState {
   id: string;
@@ -67,9 +106,12 @@ export interface MileageUpdate {
 export interface MaintenanceOutlookItem {
   definitionId: string;
   name: string;
+  currentMileage: number | null;
   intervalValue?: number | null;
   intervalUnit?: MaintenanceIntervalUnit | null;
   intervalMiles: number | null;
+  lastServiceRecordId: string | null;
+  lastServiceMileage: number | null;
   dueMileage: number | null;
   remainingMiles: number | null;
   status: MaintenanceOutlookStatus;
@@ -78,6 +120,7 @@ export interface MaintenanceOutlookItem {
   sourcePageStart?: number | null;
   sourcePageEnd?: number | null;
   sourcePrintedPageLabel?: string | null;
+  rawOcrContext?: string | null;
   sourceHref?: string | null;
 }
 

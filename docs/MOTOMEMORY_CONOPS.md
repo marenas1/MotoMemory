@@ -11,17 +11,17 @@ This document is the operational baseline for MotoMemory. It describes the probl
 - [Part 1: Core Motorcycle State](#part-1-core-motorcycle-state)
 - [Part 2: Manual-Grounded Knowledge](#part-2-manual-grounded-knowledge)
 - [Part 3: Personalized Maintenance History](#part-3-personalized-maintenance-history)
-- [Part 4: Public Demo Mode](#part-4-public-demo-mode)
-- [Part 5: Mobile Companion](#part-5-mobile-companion)
-- [Part 6: Automatic Ride Tracking](#part-6-automatic-ride-tracking)
+- [Part 4: Public Read-Only Showcase and Owner Workspace](#part-4-public-read-only-showcase-and-owner-workspace)
+- [Stretch Goal A: Mobile Companion](#stretch-goal-a-mobile-companion)
+- [Stretch Goal B: Automatic Ride Tracking](#stretch-goal-b-automatic-ride-tracking)
 - [Schema / Data Model Additions](#schema--data-model-additions)
 - [Implementation Phases](#implementation-phases)
   - [Phase 1: Next.js Web App + Manual Mileage](#phase-1-nextjs-web-app--manual-mileage)
   - [Phase 2: Manual Ingestion / RAG](#phase-2-manual-ingestion--rag)
   - [Phase 3: Maintenance History](#phase-3-maintenance-history)
-  - [Phase 4: Public Demo Mode](#phase-4-public-demo-mode)
-  - [Phase 5: Expo Mobile Client](#phase-5-expo-mobile-client)
-  - [Phase 6: GPS Ride Tracking](#phase-6-gps-ride-tracking)
+  - [Phase 4: Public Read-Only Showcase](#phase-4-public-read-only-showcase)
+  - [Stretch Goal A: Expo Mobile Client](#stretch-goal-a-expo-mobile-client)
+  - [Stretch Goal B: GPS Ride Tracking](#stretch-goal-b-gps-ride-tracking)
 - [Design Decisions](#design-decisions)
 - [Test Strategy](#test-strategy)
 - [Open Questions](#open-questions)
@@ -31,8 +31,9 @@ This document is the operational baseline for MotoMemory. It describes the probl
 - Give a rider one trustworthy view of a motorcycle's current mileage, service history, and next maintenance concerns.
 - Ground maintenance answers in the service manual for the rider's actual motorcycle.
 - Reduce repetitive manual updates while keeping the rider in control of important state changes.
-- Grow the product in useful increments so every phase can operate independently.
-- Demonstrate a clear path from a simple web tool to a lightweight motorcycle digital twin.
+- Grow the product in useful increments so every committed phase can operate independently.
+- Let visitors see the real product while protecting the owner's ability to change private data.
+- Leave mobile and GPS as optional extensions rather than making them prerequisites for the web product.
 
 ## Problem Statement
 
@@ -43,36 +44,37 @@ The following concerns motivate MotoMemory. No production measurements exist yet
 | Projected: mileage, service history, and manual guidance are commonly kept in separate places. | A rider must reconstruct the motorcycle's state before deciding what maintenance is next, increasing the chance of missed or duplicated work. |
 | Projected: generic AI answers do not reliably reflect the exact year, model, market, or service schedule of a motorcycle. | A confident but incorrect answer can lead to unnecessary work or missed maintenance. |
 | Projected: mileage is the main trigger for many maintenance intervals, but it is often updated only when a rider remembers to do it. | The digital record becomes stale between rides, so upcoming-maintenance calculations lose value. |
-| Confirmed by project direction: a full mobile and GPS solution would introduce more privacy, battery, permission, and platform concerns than are needed to prove the core idea. | Building automation first would delay the first useful experience and make it harder to isolate whether the underlying maintenance model is correct. |
-| Projected: recruiters and engineers need to understand the product quickly without creating an account or supplying their own motorcycle data. | A private or setup-heavy project is harder to evaluate as a portfolio artifact. |
+| Confirmed by project direction: a full mobile and GPS solution would introduce more privacy, battery, permission, and platform concerns than are needed to prove the core idea. | Mobile and GPS remain stretch goals; building them first would delay the useful web experience. |
+| Projected: visitors need to understand the product quickly without creating an account or supplying their own motorcycle data. | A private or setup-heavy project is harder to evaluate as a portfolio artifact. |
+| Projected: exposing the owner's live writable records to anonymous visitors would create an integrity and privacy risk. | Guest reads need a separate published boundary so public access cannot mutate the owner's motorcycle state. |
 
 ## Stakeholders & Roles
 
 | Stakeholder | Role | What They Need From This System |
 |---|---|---|
 | Motorcycle owner | Primary user; maintains one or more motorcycles and supplies mileage, manuals, and service records. | A concise, current answer to “what should I be thinking about next?” with enough source and history to trust it. |
-| Rider | Uses the mobile client during or immediately after a ride. | Low-friction ride controls and a clear way to review or accept mileage changes. |
-| Portfolio reviewer | Evaluates the public demo as a recruiter, engineer, or prospective collaborator. | An understandable, safe, interactive tour of the product's value and evolution. |
+| Guest / portfolio reviewer | Views the published motorcycle, searches the manual, and asks source-backed questions without signing in. | An understandable view of the real product without the ability to change owner data. |
+| Motorcycle owner | Signs in for private write access and chooses when current data is published. | Full control over mileage, service history, manual evidence, and public visibility. |
 | Product owner | Decides whether a phase is ready to advance. | Evidence that the current phase is useful on its own and that its data can support the next phase. |
 | Operator / maintainer | Keeps the application, document processing, and client integrations available. | Visible failures, recoverable processing, and clear boundaries around external services and user data. |
 
 ## System Overview
 
 ```text
- Rider / Reviewer
-       │
-       ▼
- Web Dashboard ────────┐
-                       ├── MotoMemory motorcycle state
- Expo Mobile Client ──┘       │
-                               ├── Mileage and ride updates
- Service Manual ──────────────┤
-                               ├── Maintenance history and projections
- Rider Questions ──────────────┤
-                               └── Source-backed answers
+ Guest ─────── read-only showcase ───────┐
+                                        │
+ Owner ─────── authenticated workspace ──┼── published motorcycle view
+                                        │
+ Manual / history / mileage ────────────┘
 ```
 
-MotoMemory maintains a digital representation of a motorcycle. For Phase 1, that representation is one configured 1981 Suzuki GS750 with an initial mileage of 18,501 mi; it does not require an owner profile or account. The state then gains manual-specific knowledge, service history, a public demonstration surface, and a mobile interface. GPS ride tracking is the final planned automation: it estimates miles traveled and proposes or applies a new mileage state according to the product's trust and confirmation rules. The web and mobile clients are different views over the same motorcycle state rather than separate products with separate records.
+MotoMemory maintains a digital representation of one configured 1981 Suzuki
+GS750. The owner uses an authenticated workspace to update private state. A
+guest sees a published read-only snapshot of the owner's motorcycle, including
+the selected manual, service history, maintenance outlook, and retrieval
+experience. The public snapshot has no write path back to the owner workspace.
+Mobile and GPS remain optional future views and automation rather than part of
+the committed web product sequence.
 
 ## Part 1: Core Motorcycle State
 
@@ -209,57 +211,104 @@ Failure modes:
 
 The phase should let a rider explain every projected maintenance item in terms of an interval and a last-service event. The acceptance measurement is a calculation matrix covering before-due, due, overdue, missing-history, and inconsistent-mileage cases; all critical cases must produce the expected status and explain the inputs used. The product should make repeated manual lookups unnecessary for routine planning.
 
-## Part 4: Public Demo Mode
+## Part 4: Public Read-Only Showcase and Owner Workspace
 
 ### Concept
 
-Phase 4 packages the working experience as a safe, portfolio-friendly demo. A visitor can open a preloaded GS750 profile, inspect example mileage and service history, ask manual-backed questions, simulate mileage changes, and mark demo maintenance items complete without creating an account or changing a real rider's data.
+Phase 4 makes the actual GS750 experience publicly viewable without making the
+owner's data publicly writable. A guest can inspect the published motorcycle,
+see its current mileage and maintenance history, open the published manual,
+search it, and ask retrieval-backed questions. Guest actions never change
+mileage, service records, manual facts, or the published source.
 
-The demo is an operational mode, not a second product. It should make the product's story legible: stored motorcycle state leads to personalized maintenance guidance, and the manual provides evidence for AI answers.
+The owner enters through an authenticated workspace and retains the existing
+write capabilities. The owner can update mileage, create or correct service
+records, correct manual facts, and choose when a new read-only snapshot becomes
+public. The showcase is therefore a view of the real product and real
+motorcycle data, not a fictional scenario.
 
 ### Why This Approach
 
-A preloaded, isolated demo is chosen over requiring sign-up because a portfolio reviewer has limited time and no reason to provide personal information before understanding the value. The trade-off is that the demo needs seeded data, reset behavior, and clear labeling. That cost is acceptable because discoverability is a direct project goal and demo data can exercise more of the experience than an empty account would.
+A published read-only snapshot is chosen over exposing the live owner scope
+directly. It lets visitors see actual mileage, history, manual evidence, and
+maintenance results while preventing anonymous writes and allowing the owner
+to decide when changes become public. The trade-off is that the showcase can
+lag behind the private workspace until the owner publishes again. That is
+acceptable for a portfolio surface and is safer than coupling public traffic
+to live private records.
 
-An alternative was a static video or screenshots. Those explain the interface but do not demonstrate state transitions or source-backed answers. Another alternative was to expose a development environment with real data. That would create privacy and integrity risks and would make the experience less predictable for reviewers.
+An alternative was fabricated demo data. That would be easier to isolate, but
+it would not demonstrate the actual manual, extracted facts, history, or
+maintenance state the owner wants reviewers to see. Another alternative was
+to expose the live owner scope with anonymous read-only SQL access. That would
+reduce snapshot work but would make future authorization mistakes more
+dangerous and would complicate privacy, rate limiting, and manual-file
+exposure. A static video or screenshot would avoid those risks but would lose
+the useful search, PDF inspection, and source-backed question experience.
+
+The public boundary must enforce permissions on the server. A hidden or
+disabled button is not an access control. Guest requests can read the
+published scope; only an authenticated owner session can write the private
+scope or publish a new snapshot. Google OAuth or another managed login can
+identify the owner, but a separate owner-to-motorcycle authorization mapping
+still decides what that account may change.
 
 ### Operational Scenarios
 
-Sunny day:
+**Sunny day — guest**
 
-1. A visitor opens the demo link and lands on the preloaded motorcycle.
-2. The visitor reviews current mileage, maintenance history, and upcoming work.
-3. The visitor simulates additional miles or marks a demo service complete.
-4. The maintenance outlook changes immediately and the visitor can reset the scenario.
-5. The visitor follows links to the live demo, source repository, and architecture documentation.
+1. A visitor opens the showcase link without signing in.
+2. The visitor sees the owner's published GS750 mileage, service history, and maintenance outlook.
+3. The visitor searches the published manual, asks a question, and opens the cited PDF page.
+4. The visitor can inspect the real product behavior but has no control that writes data.
 
-Failure modes:
+**Sunny day — owner**
+
+1. The owner signs in through the private workspace.
+2. The owner updates mileage or records completed service as usual.
+3. The owner reviews the resulting outlook and chooses to publish a new showcase snapshot.
+4. Guests see the new snapshot while the owner retains private write access.
+
+**Failure modes**
 
 | Failure | Behavior |
 |---|---|
-| A visitor changes demo state. | Keep the change within the demo scope and prevent it from affecting real motorcycle data. |
-| The demo is left in a confusing state. | Provide an obvious reset and restore the known seed scenario. |
-| Manual question answering is unavailable. | Keep the profile and maintenance walkthrough usable, and label the AI feature unavailable. |
-| Seed data or manual references are missing. | Fail visibly in the demo environment and provide enough fallback state to explain the product. |
-| A visitor mistakes simulated mileage for real data. | Label simulation and demo state consistently at the point of interaction. |
+| A guest attempts to change mileage or service history. | Reject the write server-side and leave both the private workspace and published snapshot unchanged. |
+| Owner authentication is unavailable. | Keep the published read-only showcase available and make private write actions unavailable. |
+| Publishing a new snapshot fails. | Keep the previous published snapshot active and show the owner that publication did not complete. |
+| The published snapshot is stale. | Show its publication time or state clearly; do not imply it is the owner's current private state. |
+| Manual search or question retrieval is unavailable. | Keep the published profile and PDF browsing available, and label retrieval as unavailable. |
+| The owner has not approved the manual for public viewing. | Keep the manual and its OCR-derived evidence private; the showcase does not expose it by default. |
+| A guest reaches a write-capable route directly. | Apply the same authorization check as the UI and return a safe denial without mutating data. |
 
 ### Implementation Touch Points
 
-- Public entry point: demo discovery, mode labeling, and portfolio links.
-- Demo data scope: seeded motorcycle, history, manual, and repeatable scenario state.
-- Simulation controls: temporary mileage and maintenance changes with reset behavior.
-- Isolation boundary: prevents demo writes from reaching real user records.
-- Project documentation: GitHub, architecture, and phase narrative links.
+- Authentication boundary: identifies the owner and establishes the authenticated session.
+- Owner authorization: maps the authenticated owner to the private motorcycle scope.
+- Published showcase scope: contains the approved read-only motorcycle, history, manual, and retrieval snapshot.
+- Read-only guest routes: expose only published data and reject all mutation methods.
+- Publish operation: creates an atomic replacement snapshot without changing private records.
+- Manual visibility control: makes public PDF, search, and question exposure an intentional owner decision.
+- Project documentation: explains the public showcase, repository, architecture, and phase narrative.
 
 ### Expected Impact
 
-A reviewer should reach the core value proposition without authentication and complete at least one meaningful state change in a short visit. The measurement is demo completion rate for the profile-to-maintenance walkthrough and the percentage of demo sessions in which reset restores the seed state. The demo is successful when it communicates the product without an operator needing to explain setup or provide live data.
+A reviewer should reach the core value proposition without authentication and
+inspect the same kind of mileage, history, manual evidence, and maintenance
+reasoning the owner uses privately. The acceptance measurement is a complete
+guest walkthrough with 0 successful mutation attempts, successful source-page
+opening, and successful retrieval when enabled. An owner publish should be
+atomic: either the previous snapshot remains or the complete new snapshot is
+available. No guest action may change the private motorcycle scope.
 
-## Part 5: Mobile Companion
+## Stretch Goal A: Mobile Companion
 
 ### Concept
 
-Phase 5 adds an Expo-based iOS and Android client to the same MotoMemory backend used by the web application. The rider can check current mileage, review upcoming maintenance, log work, ask manual questions, and use quick ride controls from a phone.
+An optional future effort could add an Expo-based iOS and Android client to the
+same MotoMemory backend used by the web application. The rider could check
+current mileage, review upcoming maintenance, log work, ask manual questions,
+and use quick ride controls from a phone.
 
 The mobile client is a more convenient surface for riding-related actions. The web dashboard remains the main portfolio and deep-review experience, while both clients reflect the same motorcycle state and service history.
 
@@ -301,11 +350,16 @@ Failure modes:
 
 The phase should make common maintenance actions practical from a phone without changing the underlying source of truth. The acceptance measurement is cross-client consistency: changes made through either client are observable in the other after synchronization, and critical reads remain understandable when offline. The mobile client is ready to support GPS only after permission handling and recovery behavior are proven independently.
 
-## Part 6: Automatic Ride Tracking
+## Stretch Goal B: Automatic Ride Tracking
 
 ### Concept
 
-Phase 6 uses the phone's GPS to estimate miles traveled during a motorcycle ride. The rider starts a ride, the app records location data according to the available permissions and operating-system limits, and the rider ends the ride. MotoMemory calculates a distance estimate, shows the result, and updates the motorcycle mileage according to the product's confirmation policy before recalculating maintenance.
+An optional future effort could use the phone's GPS to estimate miles traveled
+during a motorcycle ride. The rider would start a ride, the app would record
+location data according to the available permissions and operating-system
+limits, and the rider would end the ride. MotoMemory would calculate a
+distance estimate, show the result, and update motorcycle mileage only under
+an agreed confirmation policy.
 
 The feature is deliberately an estimate. GPS distance can be affected by signal quality, route shape, device settings, and background execution limits. The operational goal is to reduce repeated odometer entry while preserving a trustworthy distinction between measured, estimated, and rider-confirmed state.
 
@@ -356,7 +410,7 @@ The following is a logical data model for the evolving product. It is a planning
 ```text
 MotorcycleProfile
   id: identifier
-  scope_id: identifier              # user scope or demo scope
+  scope_id: identifier              # private owner scope or published showcase scope
   make: text
   model: text
   year: integer?
@@ -364,12 +418,27 @@ MotorcycleProfile
   mileage_unit: enum(mi, km)
   manual_id: identifier?
 
+OwnerAccount
+  id: identifier
+  auth_subject: identifier           # managed authentication provider subject
+  role: enum(owner)
+  private_scope_id: identifier
+
+ShowcasePublication
+  id: identifier
+  owner_scope_id: identifier
+  published_scope_id: identifier
+  published_at: timestamp
+  manual_visibility: enum(private, published)
+  status: enum(active, superseded, failed)
+
 ManualDocument
   id: identifier
   motorcycle_id: identifier
   file_name: text
   processing_status: enum(pending, ready, failed)
   source_model_label: text?
+  visibility: enum(private, published)
 
 ManualChunk
   id: identifier
@@ -412,14 +481,22 @@ RideSession
 
 Important indexes support the operational questions the product must answer:
 
-- `(scope_id, id)` on `MotorcycleProfile` keeps real and demo data isolated and makes scoped lookup explicit.
+- `(scope_id, id)` on `MotorcycleProfile` keeps private owner data and published showcase data isolated and makes scoped lookup explicit.
+- `(published_scope_id, published_at)` on `ShowcasePublication` selects the active public snapshot and displays its freshness.
 - `(motorcycle_id, performed_mileage)` and `(motorcycle_id, performed_at)` on `MaintenanceRecord` support last-service and historical views.
 - `(motorcycle_id, name)` on `MaintenanceDefinition` supports maintenance projections for one motorcycle.
 - `(manual_id, page_number, section_label)` on `ManualChunk` supports source navigation and citations.
 - The searchable representation on `ManualChunk` supports relevant manual passage retrieval.
 - `(motorcycle_id, started_at)` on `RideSession` supports ride history and recovery inspection.
 
-The principal relationships are: a motorcycle has one active manual and many manual-derived chunks, definitions, service records, and ride sessions; a maintenance record may reference a definition; a definition may reference the manual chunk that supports it; and a ride session may produce one mileage update. All records carry or inherit motorcycle scope. Demo records use a dedicated demo scope and never share a write path with a rider's real records.
+The principal relationships are: an owner account controls a private scope; a
+private motorcycle has one active manual and many manual-derived chunks,
+definitions, and service records; a maintenance record may reference a
+definition; a definition may reference the manual chunk that supports it; and
+a showcase publication copies approved state into a separate read-only
+published scope. Guests can read only the active published scope. Owner writes
+remain scoped to the authenticated private scope. Mobile and ride-session
+records are reserved for the stretch goals.
 
 ## Implementation Phases
 
@@ -457,36 +534,39 @@ The principal relationships are: a motorcycle has one active manual and many man
 - Dependencies: Phase 1 state and Phase 2 manual-derived intervals, with a safe fallback for unavailable intervals.
 - Gate for Phase 4: The calculation matrix passes for before-due, due, overdue, missing-history, out-of-order, and inconsistent-data cases, and a reviewer can reconstruct each result from displayed inputs.
 
-### Phase 4: Public Demo Mode
+### Phase 4: Public Read-Only Showcase
 
-- Objective: Make the working product safely explorable without an account or real motorcycle data.
+- Objective: Let guests inspect the actual motorcycle experience while preserving authenticated owner write access.
 - Deliverables:
-  - Seeded GS750 profile, manual, history, and maintenance state.
-  - Mileage simulation, completion actions, reset, and demo labeling.
-  - Links to the live demo, GitHub, and architecture documentation.
-- Dependencies: Phases 1–3 provide the state, knowledge, and history experiences to demonstrate.
-- Gate for Phase 5: An unauthenticated reviewer can complete the core walkthrough, change demo state, and restore the seed state without any change to real data. The demo failure and reset paths are observable.
+  - Authenticated owner workspace for private mileage, history, manual, and fact changes.
+  - Public read-only showcase of an owner-approved motorcycle snapshot.
+  - Guest access to published mileage, service history, manual viewing, search, and retrieval-backed questions.
+  - Server-side authorization that rejects guest mutations regardless of UI controls.
+  - Atomic publish behavior, publication timestamp, and clear stale-snapshot labeling.
+  - Intentional manual visibility control so the private PDF is not exposed accidentally.
+- Dependencies: Phases 1–3 provide the state, knowledge, and history experiences; an authentication and owner-scope boundary must be added before public exposure.
+- Gate for completion: An unauthenticated reviewer can inspect the published real-data walkthrough, open source pages, and ask enabled questions; every guest write attempt is rejected; owner changes remain private until publication; and a failed publication leaves the previous snapshot available.
 
-### Phase 5: Expo Mobile Client
+### Stretch Goal A: Expo Mobile Client
 
-- Objective: Provide a native mobile view and action surface over the same motorcycle state as the web app.
+- Objective: Provide an optional native mobile view and action surface over the same authorized motorcycle state.
 - Deliverables:
-  - iOS and Android client for mileage, maintenance, history, manual questions, and ride controls.
+  - iOS and Android client for mileage, maintenance, history, and manual questions.
   - Shared identity and backend state access.
   - Permission, connectivity, refresh, and write-recovery behavior.
-- Dependencies: Stable shared state behavior from Phases 1–4 and an agreed user-scope/authentication model.
-- Gate for Phase 6: Cross-client consistency checks pass for core reads and writes, and mobile behavior remains understandable during offline or denied-permission conditions. GPS is not enabled until this gate passes.
+- Dependencies: Stable web state and an agreed user-scope/authentication model.
+- Gate: Cross-client consistency and mobile recovery behavior meet agreed thresholds. This goal is not required for the public showcase.
 
-### Phase 6: GPS Ride Tracking
+### Stretch Goal B: GPS Ride Tracking
 
-- Objective: Estimate ride distance and reduce manual mileage updates while preserving rider control over authoritative state.
+- Objective: Optionally estimate ride distance while preserving rider control over authoritative mileage.
 - Deliverables:
   - Start/end ride workflow with permission and lifecycle states.
   - GPS distance estimate and quality/confidence information.
   - Review or confirmation path, mileage update, and maintenance recalculation.
   - Incomplete-session, duplicate-finalization, privacy, and recovery handling.
-- Dependencies: Phase 5 mobile client, shared mileage update behavior, and an agreed GPS accuracy, battery, retention, and confirmation policy.
-- Gate for completion: Representative rides establish that distance accuracy, battery impact, interruption recovery, and correction behavior meet the agreed thresholds. If the thresholds are not met, the feature remains optional and never silently overrides manual mileage.
+- Dependencies: The mobile stretch goal, shared mileage behavior, and agreed GPS accuracy, battery, retention, and confirmation policies.
+- Gate: Representative rides meet the agreed accuracy, battery, interruption-recovery, and correction thresholds. If not, GPS remains optional and never silently overrides manual mileage.
 
 ## Design Decisions
 
@@ -497,11 +577,13 @@ The principal relationships are: a motorcycle has one active manual and many man
 | Keep manual mileage available through every phase. | GPS and mobile capabilities can be unavailable, inaccurate, or unwanted. Manual entry is the reliable fallback and a necessary correction path. |
 | Treat maintenance projections as explanations, not just reminders. | Showing current mileage, interval, and last service mileage lets the rider assess why an item is approaching or overdue. |
 | Keep history as persistent events. | A service event needs mileage and time context so later calculations can identify the applicable last service. |
-| Separate demo scope from real user scope. | Portfolio exploration must be safe, repeatable, and independent of real rider data. |
-| Keep web and mobile on one backend state. | Two clients should produce one motorcycle state; separate client stores would invite drift and conflicting maintenance views. |
-| Make GPS mileage an estimate with visible origin and confidence. | Phone GPS is convenient but not an authoritative odometer. The rider must be able to review or reject uncertain updates. |
-| Use explicit ride sessions instead of always-on tracking. | Start and end controls make consent, battery use, and data retention easier to understand and operate. |
-| Keep the project useful without AI, mobile, or GPS. | Each phase must deliver standalone value and should not be blocked by later capability risk. |
+| Separate the published showcase scope from the private owner scope. | Guests need to see real product data without receiving a write path to the owner's motorcycle. |
+| Require owner authentication for private writes. | A guest-facing UI restriction is insufficient; the server must authorize every mutation against the authenticated owner scope. |
+| Publish an explicit read-only snapshot instead of exposing the live owner scope directly. | The owner controls freshness and can keep private changes private until publication; a failed publish leaves the previous snapshot intact. |
+| Make manual visibility an explicit publication decision. | The actual PDF and OCR-derived evidence may be private even when the motorcycle summary is public. |
+| Keep web as the committed primary client. | A future mobile client must use the same authorized backend state, but it is not required to prove the public showcase. |
+| Keep GPS mileage as a future estimate with visible origin and confidence. | GPS is convenient but not an authoritative odometer; it remains a stretch goal until accuracy, battery, privacy, and correction behavior are proven. |
+| Keep the project useful without AI, mobile, or GPS. | The committed web phases deliver standalone value and are not blocked by later capability risk. |
 
 ## Test Strategy
 
@@ -512,17 +594,19 @@ Testing is organized around observable behavior and phase gates rather than impl
 | 1 | Create, view, update, and validate motorcycle mileage. | Valid updates persist and recalculate consistently; invalid updates never replace the last valid state. | A user can see a mileage value that was not accepted or cannot tell whether an update saved. |
 | 2 | Ingest manuals, retrieve evidence, and answer questions. | Backed answers point to relevant source sections; unsupported or ambiguous questions are labeled as such. | The system answers confidently without evidence or associates a manual with the wrong motorcycle. |
 | 3 | Record service and calculate due status. | Results match the calculation matrix and expose the interval and last-service inputs. | The same history produces different statuses or an overdue item appears current without explanation. |
-| 4 | Enter, mutate, reset, and revisit demo state. | A reviewer can complete the walkthrough without authentication and reset returns to the known seed state. | Demo writes leak into real data, or a broken dependency leaves the reviewer unable to understand the product. |
-| 5 | Read and write shared state from web and mobile. | Accepted changes converge across clients and offline/permission failures are explicit and recoverable. | Clients show conflicting authoritative mileage or silently lose a service record. |
-| 6 | Track rides, estimate distance, handle interruptions, and update mileage. | Measured accuracy, battery, recovery, and correction results meet the agreed thresholds for supported configurations. | GPS silently changes mileage after a degraded or interrupted session, or error exceeds the accepted maintenance-planning tolerance. |
+| 4 | Guest reads, owner authentication, publication, and write rejection. | A guest completes the real-data walkthrough with 0 successful mutations; owner changes remain private until an atomic publish; the previous snapshot survives publish failure. | A guest can mutate owner or published data, private manual evidence leaks unintentionally, or a partial publish leaves an incomplete showcase. |
+| Stretch A | Read and write shared state from a future mobile client. | Accepted changes converge across clients and offline/permission failures are explicit and recoverable. | A future client shows conflicting authoritative mileage or silently loses a service record. |
+| Stretch B | Track rides, estimate distance, handle interruptions, and update mileage. | Measured accuracy, battery, recovery, and correction results meet agreed thresholds for supported configurations. | GPS silently changes mileage after a degraded or interrupted session, or error exceeds the accepted maintenance-planning tolerance. |
 
 ## Open Questions
 
 - Which exact maintenance items and intervals should replace the provisional Phase 1 1,000-mile cadence after manual ingestion? Phase 1 uses the provisional cadence so the app can be exercised before the manual is processed.
 - Which manual formats and scan quality levels are in scope for the first ingestion release? This determines the evidence and extraction-quality threshold.
 - How should conflicting intervals from a manual be presented when the difference depends on market, usage severity, or model year? This needs product guidance before interval extraction is treated as authoritative.
-- Should a rider confirm every GPS mileage estimate, or only estimates below a confidence threshold? This is deferred until representative ride accuracy data exists.
-- What distance error and battery-impact thresholds are acceptable for GPS tracking? These should be based on real supported-device measurements rather than assumed GPS precision.
-- What authentication and account model is required when one rider owns multiple motorcycles or uses more than one client? The demo can remain anonymous, but real cross-client state needs an explicit scope.
-- What privacy and retention policy applies to route data, derived distance, and ride timestamps? This must be resolved before collecting location data outside a local test context.
+- Which managed authentication provider and owner-account recovery flow should Phase 4 use? Google OAuth is the current preference, but the provider must support a reliable owner-to-private-scope mapping.
+- Should the owner publish the manual PDF, OCR passages, and question answering together, or allow each public evidence surface to be enabled independently? The safe default is private until explicitly published.
+- How should the owner trigger publication: an explicit publish action, automatic publication after each private change, or a scheduled snapshot? The current recommendation is explicit publication.
 - Which maintenance data is advisory versus safety-critical, and what rider-facing language should distinguish the two? This affects answer tone, warnings, and the boundary between assistance and professional service advice.
+- Stretch goal: Should a future mobile client support the same owner/guest distinction from the start, or remain owner-only until public web authorization is proven?
+- Stretch goal: Should a rider confirm every GPS mileage estimate, or only estimates below a confidence threshold? This is deferred until representative ride accuracy data exists.
+- Stretch goal: What distance error, battery-impact, privacy, and retention thresholds are acceptable for GPS tracking? These should be based on real supported-device measurements rather than assumed GPS precision.

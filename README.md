@@ -42,6 +42,7 @@ supabase/migrations/003_phase1_mileage_function.sql
 supabase/migrations/004_phase2_manual_schema.sql
 supabase/migrations/005_phase2_ocr_ingestion.sql
 supabase/migrations/006_phase2_maintenance_facts.sql
+supabase/migrations/007_phase3_maintenance_history.sql
 ```
 
 Then start the app:

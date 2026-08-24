@@ -49,6 +49,7 @@ supabase/migrations/003_phase1_mileage_function.sql
 supabase/migrations/004_phase2_manual_schema.sql
 supabase/migrations/005_phase2_ocr_ingestion.sql
 supabase/migrations/006_phase2_maintenance_facts.sql
+supabase/migrations/007_phase3_maintenance_history.sql
 ```
 
 The seed is intentionally idempotent and does not overwrite a manually corrected mileage value. Migration 004 creates the private `manuals` Storage bucket and manual metadata tables; it does not change the Phase 1 mileage function or provisional schedule row. Phase 1 does not enable RLS or authentication because the app is private and database access is server-side only. RLS, authentication, and an explicit owner/demo data scope are required before public deployment.

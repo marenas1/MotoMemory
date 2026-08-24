@@ -20,9 +20,10 @@ test("renders the connected motorcycle workflow when a database is configured", 
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /1981 Suzuki GS750/ })).toBeVisible();
-  await expect(page.getByText("18,501")).toBeVisible();
-  await expect(page.getByText("19,000 mi")).toBeVisible();
-  await expect(page.getByText("499 mi")).toBeVisible();
+  await expect(page.locator("#current-mileage-heading")).toHaveText(
+    /^\d[\d,]*(?:\.\d+)?$/,
+  );
+  await expect(page.locator("#maintenance-overview")).toBeVisible();
 });
 
 test("manual route loads an honest workspace without exposing storage URLs", async ({

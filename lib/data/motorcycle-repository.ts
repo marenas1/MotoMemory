@@ -2,6 +2,7 @@ import "server-only";
 
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 
+import { maintenanceRepository } from "@/lib/data/maintenance-repository";
 import { calculateMaintenanceOutlooks } from "@/lib/domain/maintenance";
 import type {
   MaintenanceDefinition,
@@ -42,6 +43,7 @@ type MaintenanceRow = QueryResultRow & {
   source_page_start: number | null;
   source_page_end: number | null;
   source_printed_page_label: string | null;
+  source_ocr_context: string | null;
   origin: "ocr" | "rider_corrected" | null;
   corrected_at: Date | null;
 };
@@ -121,6 +123,7 @@ function mapMaintenance(row: MaintenanceRow): MaintenanceDefinition {
     sourcePageStart: row.source_page_start,
     sourcePageEnd: row.source_page_end,
     sourcePrintedPageLabel: row.source_printed_page_label,
+    rawOcrContext: row.source_ocr_context,
     origin: row.origin,
     correctedAt: row.corrected_at?.toISOString() ?? null,
     sourceHref:
@@ -196,7 +199,8 @@ const postgresRepository: MotorcycleRepository = {
         `select id, motorcycle_id, name, interval_value, interval_unit,
                 interval_miles, due_window_miles, status, source, notes,
                 source_manual_id, source_page_start, source_page_end,
-                source_printed_page_label, origin, corrected_at
+                source_printed_page_label, source_ocr_context, origin,
+                corrected_at
            from public.maintenance_definitions
           where motorcycle_id = $1
             and status = 'active'
@@ -206,12 +210,16 @@ const postgresRepository: MotorcycleRepository = {
 
       const motorcycle = mapMotorcycle(motorcycleRow);
       const definitions = maintenanceResult.rows.map(mapMaintenance);
+      const records = await maintenanceRepository.listMaintenanceRecords(
+        motorcycleId,
+      );
 
       return {
         motorcycle,
         maintenanceOutlook: calculateMaintenanceOutlooks(
           motorcycle.currentMileage,
           definitions,
+          records,
         ),
       };
     } catch (error) {

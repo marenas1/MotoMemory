@@ -1,4 +1,7 @@
+import { loadEnvConfig } from "@next/env";
 import { defineConfig, devices } from "@playwright/test";
+
+loadEnvConfig(process.cwd());
 
 const configuredPlaywrightPort = process.env.PLAYWRIGHT_PORT ?? "3000";
 const parsedPlaywrightPort = Number(configuredPlaywrightPort);
@@ -14,6 +17,7 @@ export default defineConfig({
   testDir: "./tests/e2e",
   testMatch: "**/*.spec.ts",
   fullyParallel: true,
+  workers: process.env.DATABASE_URL ? 1 : undefined,
   reporter: "list",
   use: {
     baseURL: `http://127.0.0.1:${playwrightPort}`,

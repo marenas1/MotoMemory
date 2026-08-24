@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { MaintenanceOutlook } from "@/components/maintenance-outlook";
+import { MaintenanceHistoryPanel } from "@/components/maintenance-history-panel";
 import { MileageForm } from "@/components/mileage-form";
 import { MotorcycleNavigation } from "@/components/motorcycle-navigation";
 import { StateFeedback } from "@/components/state-feedback";
@@ -75,6 +76,20 @@ export function MotorcycleMainView({
         message: "The app could not reach the mileage service.",
       });
     }
+  }
+
+  async function refreshOverviewAfterHistoryChange() {
+    const response = await fetch("/api/motorcycle", { cache: "no-store" });
+    const payload: MotorcycleOverview | ApiError = await response.json();
+    if (!response.ok) {
+      const message =
+        "error" in payload && payload.error?.message
+          ? payload.error.message
+          : "The maintenance outlook could not be refreshed.";
+      throw new Error(message);
+    }
+
+    setOverview(payload as MotorcycleOverview);
   }
 
   const { motorcycle } = overview;
@@ -185,6 +200,11 @@ export function MotorcycleMainView({
             </div>
           </section>
         </section>
+
+        <MaintenanceHistoryPanel
+          currentMileage={motorcycle.currentMileage}
+          onHistoryChanged={refreshOverviewAfterHistoryChange}
+        />
 
         <footer className="dashboard-footer">
           <span>MotoMemory © 2026</span>

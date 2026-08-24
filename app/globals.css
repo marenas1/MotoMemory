@@ -260,10 +260,26 @@ p { line-height: 1.5; }
 .reminder-item strong { color: var(--color-text); font-size: 0.9rem; font-weight: 500; }
 .reminder-item div span { color: var(--color-faint); font-size: 0.65rem; }
 .reminder-item p { margin: 0; color: var(--color-muted); font-size: 0.8rem; }
+.maintenance-outlook-list { gap: 0.8rem; border-top: 0; }
+.maintenance-outlook-card { display: grid; min-width: 0; gap: 0.85rem; }
+.maintenance-outlook-card.reminder-item { grid-template-columns: 1fr; align-items: stretch; padding: 1rem; border: 1px solid var(--color-border-soft); border-radius: 0.65rem; background: rgb(20 26 28 / 65%); }
+.maintenance-outlook-card.reminder-item p { font-size: 0.78rem; }
+.maintenance-outlook-card .maintenance-source, .maintenance-outlook-card .provisional-note { margin: 0; }
+.maintenance-explanation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem 1rem; margin: 0; padding-top: 0.9rem; border-top: 1px solid var(--color-border-soft); }
+.maintenance-explanation div { display: grid; min-width: 0; gap: 0.22rem; }
+.maintenance-explanation dt { color: var(--color-faint); font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.maintenance-explanation dd { min-width: 0; margin: 0; color: var(--color-text); font-size: 0.9rem; overflow-wrap: anywhere; }
+.maintenance-outlook-links { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; }
+.maintenance-outlook-links a, .maintenance-source a { color: var(--color-amber-bright); text-decoration: underline; text-underline-offset: 0.15em; }
+.maintenance-evidence { padding-top: 0.8rem; border-top: 1px solid var(--color-border-soft); }
+.maintenance-evidence summary { color: var(--color-faint); cursor: pointer; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.maintenance-evidence pre { max-height: 12rem; margin: 0.65rem 0 0; overflow: auto; white-space: pre-wrap; color: var(--color-muted); font: 0.75rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 .status-pill { display: inline-flex; width: max-content; align-items: center; padding: 0.34rem 0.52rem; border: 1px solid transparent; border-radius: 999px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; }
+.status-not_recorded { border-color: rgb(240 161 43 / 38%); background: rgb(240 161 43 / 8%); color: var(--color-amber-bright); }
 .status-upcoming { border-color: rgb(169 196 108 / 38%); background: rgb(169 196 108 / 9%); color: var(--color-success); }
 .status-due { border-color: rgb(240 161 43 / 44%); background: rgb(240 161 43 / 12%); color: var(--color-amber-bright); }
+.status-overdue { border-color: rgb(232 117 95 / 42%); background: rgb(232 117 95 / 8%); color: var(--color-danger); }
 .status-unknown { border-color: var(--color-border); background: rgb(169 170 163 / 8%); color: var(--color-muted); }
 
 .update-panel { display: flex; flex-direction: column; }
@@ -281,6 +297,43 @@ p { line-height: 1.5; }
 .state-feedback-info { border-color: rgb(240 161 43 / 25%); background: rgb(240 161 43 / 8%); color: var(--color-amber-bright); }
 .state-feedback-success { border-color: rgb(169 196 108 / 30%); background: rgb(169 196 108 / 8%); color: var(--color-success); }
 .state-feedback-error { border-color: rgb(232 117 95 / 34%); background: rgb(232 117 95 / 8%); color: var(--color-danger); }
+
+.maintenance-history-panel { display: grid; gap: 1rem; margin-top: 1rem; padding: 1.65rem; }
+.maintenance-history-panel .panel-heading { margin-bottom: 0; }
+.maintenance-history-intro { max-width: 58rem; margin: 0; color: var(--color-muted); font-size: 0.82rem; }
+.maintenance-history-form-card { display: grid; gap: 1rem; padding: 1.1rem; border: 1px solid var(--color-border-soft); border-radius: 0.65rem; background: rgb(10 15 16 / 42%); }
+.maintenance-history-subheading, .maintenance-history-list-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.maintenance-history-subheading h3 { margin-bottom: 0; font-size: 1.08rem; }
+.maintenance-record-form { display: grid; gap: 1rem; }
+.maintenance-record-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8rem; }
+.maintenance-record-form label { display: grid; align-content: start; gap: 0.35rem; color: var(--color-muted); font-size: 0.76rem; font-weight: 700; }
+.maintenance-record-form input, .maintenance-record-form select, .maintenance-record-form textarea { width: 100%; min-width: 0; padding: 0.68rem 0.72rem; border: 1px solid var(--color-border); border-radius: 0.4rem; outline: none; background: #0e1416; color: var(--color-text); font: inherit; font-weight: 400; }
+.maintenance-record-form input:focus, .maintenance-record-form select:focus, .maintenance-record-form textarea:focus { border-color: var(--color-amber); box-shadow: 0 0 0 3px rgb(240 161 43 / 18%); }
+.maintenance-record-form textarea { resize: vertical; }
+.maintenance-record-form .field-help { font-weight: 400; }
+.maintenance-record-input-with-unit { display: flex; align-items: center; gap: 0.5rem; }
+.maintenance-record-input-with-unit input { flex: 1; }
+.maintenance-record-input-with-unit > span { color: var(--color-muted); font-weight: 400; }
+.optional-label { color: var(--color-faint); font-size: 0.66rem; font-weight: 400; }
+.maintenance-record-notes-field { grid-column: span 2; }
+.maintenance-record-form-actions, .maintenance-history-record-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.button-danger { padding: 0.7rem 0.75rem; border: 1px solid rgb(232 117 95 / 36%); border-radius: 0.45rem; background: transparent; color: var(--color-danger); font-weight: 700; white-space: nowrap; }
+.button-danger:hover:not(:disabled) { border-color: var(--color-danger); background: rgb(232 117 95 / 8%); }
+.maintenance-history-unavailable { display: grid; justify-items: start; gap: 0.7rem; padding: 1rem; border: 1px solid rgb(232 117 95 / 34%); border-radius: 0.6rem; background: rgb(232 117 95 / 7%); }
+.maintenance-history-unavailable p { margin: 0; color: var(--color-danger); font-size: 0.82rem; }
+.maintenance-history-list { display: grid; gap: 0.65rem; }
+.maintenance-history-list-heading { padding-top: 0.25rem; }
+.maintenance-history-list-heading .eyebrow { margin-bottom: 0; }
+.maintenance-history-list-heading > span { color: var(--color-faint); font-size: 0.72rem; }
+.maintenance-history-record { display: grid; gap: 0.75rem; padding: 1rem; border: 1px solid var(--color-border-soft); border-radius: 0.6rem; background: rgb(20 26 28 / 65%); }
+.maintenance-history-record-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.maintenance-history-record-heading h3 { margin-bottom: 0; font-size: 1rem; }
+.maintenance-history-record-heading strong { color: var(--color-amber-bright); font-size: 1.05rem; font-weight: 500; white-space: nowrap; }
+.maintenance-history-metadata { display: flex; flex-wrap: wrap; gap: 0.7rem 1.5rem; margin: 0; padding-top: 0.7rem; border-top: 1px solid var(--color-border-soft); }
+.maintenance-history-metadata div { display: grid; gap: 0.18rem; }
+.maintenance-history-metadata dt { color: var(--color-faint); font-size: 0.64rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.maintenance-history-metadata dd { max-width: 34rem; margin: 0; color: var(--color-muted); font-size: 0.78rem; overflow-wrap: anywhere; }
+.maintenance-history-notes { margin: 0; color: var(--color-muted); font-size: 0.8rem; white-space: pre-wrap; }
 
 .quick-actions { margin-top: auto; padding-top: 2rem; }
 .quick-actions-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem; }
@@ -466,7 +519,7 @@ p { line-height: 1.5; }
   .dashboard-content { --content-gutter: 0.85rem; padding-inline: var(--content-gutter); }
   .topbar { display: grid; gap: 1rem; }
   .scope-label { width: max-content; }
-  .hero-panel, .mileage-panel, .maintenance-panel, .update-panel { padding: 1.2rem; }
+  .hero-panel, .mileage-panel, .maintenance-panel, .update-panel, .maintenance-history-panel { padding: 1.2rem; }
   .hero-panel { min-height: 29rem; }
   .hero-copy { max-width: 100%; margin-left: 0; text-align: left; }
   .hero-copy h2 { font-size: clamp(2.1rem, 15vw, 3.6rem); }
@@ -476,7 +529,12 @@ p { line-height: 1.5; }
   .mileage-form-controls .button { flex: 1 1 100%; }
   .reminder-item { grid-template-columns: 1fr auto; }
   .reminder-item p { grid-column: 1 / -1; grid-row: 2; }
+  .maintenance-outlook-card.reminder-item { grid-template-columns: 1fr; }
+  .maintenance-explanation { grid-template-columns: 1fr; }
   .quick-actions-grid { grid-template-columns: 1fr; }
+  .maintenance-record-form-grid { grid-template-columns: 1fr; }
+  .maintenance-record-notes-field { grid-column: auto; }
+  .maintenance-history-record-heading { display: grid; }
   .dashboard-footer { justify-content: flex-start; }
   .manual-page-target-bar { display: grid; align-items: start; }
   .manual-page-labels { text-align: left; }
