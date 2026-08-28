@@ -123,7 +123,7 @@ describe("maintenance outlook presentation", () => {
     expect(markup).toContain("16,000 mi");
     expect(markup).toContain("18,500 mi");
     expect(markup).toContain("-1 mi");
-    expect(markup).toContain('href="#maintenance-record-123e4567-e89b-12d3-a456-426614174000"');
+    expect(markup).toContain('href="/history#maintenance-record-123e4567-e89b-12d3-a456-426614174000"');
     expect(markup).toContain('href="/manual?page=42&amp;printedPage=38"');
     expect(markup).toContain("Change engine oil every 2,500 miles.");
   });

@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 import { MaintenanceOutlook } from "@/components/maintenance-outlook";
-import { MaintenanceHistoryPanel } from "@/components/maintenance-history-panel";
 import { MileageForm } from "@/components/mileage-form";
 import { MotorcycleNavigation } from "@/components/motorcycle-navigation";
 import { StateFeedback } from "@/components/state-feedback";
@@ -80,20 +79,6 @@ export function MotorcycleMainView({
     }
   }
 
-  async function refreshOverviewAfterHistoryChange() {
-    const response = await fetch("/api/motorcycle", { cache: "no-store" });
-    const payload: MotorcycleOverview | ApiError = await response.json();
-    if (!response.ok) {
-      const message =
-        "error" in payload && payload.error?.message
-          ? payload.error.message
-          : "The maintenance outlook could not be refreshed.";
-      throw new Error(message);
-    }
-
-    setOverview(payload as MotorcycleOverview);
-  }
-
   const { motorcycle } = overview;
 
   return (
@@ -107,7 +92,7 @@ export function MotorcycleMainView({
               <p className="eyebrow">MotoMemory dashboard</p>
               <h1>{canManage ? "Welcome back." : "Motorcycle memory."}</h1>
               <p className="topbar-subtitle">
-                {canManage ? "Here&apos;s your bike at a glance." : "A live, read-only view of the motorcycle workspace."}
+                {canManage ? "Here's your bike at a glance." : "A live, read-only view of the motorcycle workspace."}
               </p>
             </div>
             <span className="scope-label">{canManage ? "Owner · editable" : "Guest · read only"}</span>
@@ -167,7 +152,7 @@ export function MotorcycleMainView({
         </div>
 
         <section className="content-grid">
-          <MaintenanceOutlook items={overview.maintenanceOutlook} />
+          <MaintenanceOutlook items={overview.maintenanceOutlook.slice(0, 1)} />
 
           <section className="update-panel panel" id="mileage-update" aria-labelledby="update-heading">
             <div className="panel-heading">
@@ -203,7 +188,6 @@ export function MotorcycleMainView({
             <div className="quick-actions" aria-labelledby="quick-actions-heading">
               <div className="quick-actions-heading">
                 <p className="eyebrow" id="quick-actions-heading">Quick actions</p>
-                <span className="quick-actions-note">Phase 1</span>
               </div>
               <div className="quick-actions-grid">
                 {canManage ? (
@@ -222,12 +206,6 @@ export function MotorcycleMainView({
             </div>
           </section>
         </section>
-
-        <MaintenanceHistoryPanel
-          currentMileage={motorcycle.currentMileage}
-          readOnly={!canManage}
-          onHistoryChanged={refreshOverviewAfterHistoryChange}
-        />
 
         <footer className="dashboard-footer">
           <span>MotoMemory © 2026</span>

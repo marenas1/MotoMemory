@@ -18,8 +18,9 @@ could not start a reachable Playwright web server.
   deployed read. No publish, snapshot, or synchronization action exists.
 - Passphrase, session-cookie, login, logout, Settings, Supabase Auth, and
   account-mapping code are not active dependencies.
-- Migrations `001`–`010` remain immutable. Migration `010` is dormant history;
-  it is not queried and must not be deleted or rewritten.
+- Migrations `001`–`011` remain immutable. Migration `010` is dormant history;
+  it is not queried and must not be deleted or rewritten. Migration `011`
+  seeds the owner-reported acquisition checkup and is safe to apply once.
 
 ## Configuration handoff
 

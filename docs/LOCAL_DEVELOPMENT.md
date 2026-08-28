@@ -91,11 +91,15 @@ supabase/migrations/007_phase3_maintenance_history.sql
 supabase/migrations/008_phase4_identity_and_showcase.sql
 supabase/migrations/009_phase4_public_rate_limits.sql
 supabase/migrations/010_phase4_owner_login_rate_limits.sql
+supabase/migrations/011_seed_acquisition_checkup.sql
+supabase/migrations/012_fix_public_rate_limit_function.sql
 ```
 
 Migrations `001`–`007` contain the live motorcycle, manual, OCR, facts, and
 history state. Migration `009` provides public-read abuse counters. Migration
 `010` is retained history for an earlier owner-login design and is dormant.
+Migration `011` seeds the owner-reported general checkup at 18,000 miles for
+active maintenance items without existing service history.
 Migration `008` is retained history from an earlier identity/projection design;
 its legacy tables are dormant and the current application does not consult
 them. Do not delete, rewrite, reorder, or reset applied migrations on the
@@ -114,9 +118,11 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). With
-`MOTOMEMORY_RUNTIME_MODE=owner`, `/` and `/manual` are the editable local
-owner workspace without a login step. With `readonly`, the same routes remain
-live reads and all mutations return a stable `403` read-only response.
+`MOTOMEMORY_RUNTIME_MODE=owner`, `/`, `/maintenance`, `/history`, and `/manual`
+are the editable local owner workspace without a login step. The dashboard
+shows the next item, `/maintenance` shows the full upcoming outlook, and
+`/history` contains completed service records. With `readonly`, the same routes
+remain live reads and all mutations return a stable `403` read-only response.
 
 ## Trusted client IP and public limits
 

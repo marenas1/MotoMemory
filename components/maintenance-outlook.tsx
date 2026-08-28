@@ -66,7 +66,7 @@ function remainingLabel(item: MaintenanceOutlookItem): string {
 
 function serviceRecordHref(item: MaintenanceOutlookItem): string | null {
   return item.lastServiceRecordId
-    ? `#maintenance-record-${item.lastServiceRecordId}`
+    ? `/history#maintenance-record-${item.lastServiceRecordId}`
     : null;
 }
 
@@ -137,7 +137,7 @@ function MaintenanceOutlookCard({
       <div className="maintenance-outlook-links">
         {serviceRecord ? <a href={serviceRecord}>View service record</a> : null}
         {item.status === "not_recorded" ? (
-          <a href="#maintenance-history">Add completed service</a>
+          <a href="/history#maintenance-history">Add completed service</a>
         ) : null}
       </div>
 

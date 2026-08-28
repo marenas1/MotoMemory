@@ -370,6 +370,8 @@ p { line-height: 1.5; }
 .empty-state { margin: 0; color: var(--color-muted); font-size: 0.85rem; }
 
 .manual-content { gap: 1rem; }
+.history-content { gap: 1rem; }
+.maintenance-content { gap: 1rem; }
 .manual-topbar { margin-bottom: 0.5rem; }
 .manual-topbar h1 { max-width: 48rem; }
 .manual-workspace { display: grid; gap: 1rem; }

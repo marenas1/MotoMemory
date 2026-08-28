@@ -19,4 +19,16 @@ describe("Phase 4.5 rate-limit migration contract", () => {
     expect(migration).not.toContain("showcase_snapshots");
     expect(migration).not.toContain("manual_chunks");
   });
+
+  it("qualifies the rate-limit table columns in the forward repair migration", () => {
+    const migration = readFileSync(
+      "supabase/migrations/012_fix_public_rate_limit_function.sql",
+      "utf8",
+    );
+
+    expect(migration).toContain("create or replace function public.consume_public_rate_limit");
+    expect(migration).toContain("rate_window.request_count");
+    expect(migration).toContain("rate_window.violation_count");
+    expect(migration).toContain("revoke execute on function public.consume_public_rate_limit");
+  });
 });

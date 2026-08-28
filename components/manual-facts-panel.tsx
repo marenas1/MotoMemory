@@ -148,7 +148,7 @@ export function ManualFactsPanel({
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [factsExpanded, setFactsExpanded] = useState(true);
+  const [factsExpanded, setFactsExpanded] = useState(false);
 
   useEffect(() => {
     if (manual.status !== "ready") return undefined;

@@ -590,8 +590,9 @@ the mode change is application configuration and does not migrate domain data.
 - [ ] Supabase project URL, service-role key, and Storage bucket are configured
       as server-only deployment secrets.
 - [ ] Migration 009 is applied.
-- [ ] Migrations 001–010 are retained as applied history; migration 010 is
-      dormant and is not queried by the application.
+- [ ] Migrations 001–011 are retained as applied history; migration 010 is
+      dormant and is not queried by the application. Migration 011 contains
+      the owner-reported acquisition checkup seed.
 - [ ] The public deployed origin and trusted client-IP behavior are configured
       for the public rate limiter.
 - [ ] `/` and `/manual` work without an account.

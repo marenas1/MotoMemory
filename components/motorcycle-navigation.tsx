@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-type NavigationItem = "dashboard" | "manual" | "history";
+type NavigationItem = "dashboard" | "maintenance" | "manual" | "history";
 
 export function MotorcycleNavigation({
   active,
@@ -33,14 +33,17 @@ export function MotorcycleNavigation({
           <span className="nav-icon" aria-hidden="true">⌂</span>
           Dashboard
         </Link>
-        <span className="nav-item nav-item-deferred" aria-disabled="true" title="Planned for a later phase">
+        <Link
+          className={`nav-item${active === "maintenance" ? " nav-item-active" : ""}`}
+          href="/maintenance"
+          aria-current={active === "maintenance" ? "page" : undefined}
+        >
           <span className="nav-icon" aria-hidden="true">⚒</span>
           Maintenance
-          <small>Later phase</small>
-        </span>
+        </Link>
         <Link
           className={`nav-item${active === "history" ? " nav-item-active" : ""}`}
-          href="/#maintenance-history"
+          href="/history"
           aria-current={active === "history" ? "page" : undefined}
         >
           <span className="nav-icon" aria-hidden="true">◷</span>

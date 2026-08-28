@@ -67,11 +67,15 @@ supabase/migrations/007_phase3_maintenance_history.sql
 supabase/migrations/008_phase4_identity_and_showcase.sql
 supabase/migrations/009_phase4_public_rate_limits.sql
 supabase/migrations/010_phase4_owner_login_rate_limits.sql
+supabase/migrations/011_seed_acquisition_checkup.sql
+supabase/migrations/012_fix_public_rate_limit_function.sql
 ```
 
 Migrations 008 and 010 are retained migration history from earlier Phase 4
 designs; their legacy identity and owner-login tables are dormant. Do not
-delete or rewrite applied migrations.
+delete or rewrite applied migrations. Migration 011 adds the owner-reported
+18,000-mile general checkup to active maintenance items that have no existing
+service history.
 
 Start the app:
 
@@ -80,9 +84,11 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). In local owner mode the
-normal dashboard, maintenance history, and manual pages are editable without
-an account or a sign-in step. Missing database or Storage configuration produces
-an honest unavailable state.
+normal dashboard, maintenance outlook, service history, and manual pages are
+editable without an account or a sign-in step. The dashboard shows the next
+maintenance item; `/maintenance` shows the full upcoming list and `/history`
+shows completed service records. Missing database or Storage configuration
+produces an honest unavailable state.
 
 ## Manual workflow
 
