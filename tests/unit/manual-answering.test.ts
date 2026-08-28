@@ -13,6 +13,7 @@ import type {
   ManualDocumentRecord,
 } from "@/lib/manual/manual-types";
 import { MockAnswerProvider } from "@/tests/fixtures/mock-answer-provider";
+import { TEST_SCOPE } from "@/tests/fixtures/test-scope";
 
 const manual: ManualDocumentRecord = {
   id: "123e4567-e89b-12d3-a456-426614174000",
@@ -49,7 +50,7 @@ function dependencies(
 ) {
   return {
     repository: {
-      searchChunks: vi.fn(async (_manualId: string, _query: string, limit: number) => {
+      searchChunks: vi.fn(async (_scope, _manualId: string, _query: string, limit: number) => {
         expect(limit).toBe(MAX_ANSWER_PASSAGES);
         return passages;
       }),
@@ -86,6 +87,7 @@ describe("manual answer boundary", () => {
     }));
 
     const result = await answerManualQuestion(
+      TEST_SCOPE,
       manual,
       "What is the oil interval?",
       dependencies(provider),
@@ -111,6 +113,7 @@ describe("manual answer boundary", () => {
     };
 
     const result = await answerManualQuestion(
+      TEST_SCOPE,
       manual,
       "Which garage should I use for winter storage?",
       dependencies(provider, []),
@@ -127,6 +130,7 @@ describe("manual answer boundary", () => {
     };
 
     const result = await answerManualQuestion(
+      TEST_SCOPE,
       manual,
       "What is the oil interval?",
       dependencies(provider, [{ ...passage, manualId: "another-manual" }]),
@@ -153,7 +157,7 @@ describe("manual answer boundary", () => {
     };
 
     await expect(
-      answerManualQuestion(manual, "Where is the interval?", dependencies(provider)),
+      answerManualQuestion(TEST_SCOPE, manual, "Where is the interval?", dependencies(provider)),
     ).resolves.toMatchObject({
       state: "citation_mismatch",
       citations: [],
@@ -169,6 +173,7 @@ describe("manual answer boundary", () => {
     };
 
     const result = await answerManualQuestion(
+      TEST_SCOPE,
       manual,
       "What is the oil interval?",
       dependencies(provider),
@@ -199,6 +204,7 @@ describe("manual answer boundary", () => {
     };
 
     await answerManualQuestion(
+      TEST_SCOPE,
       manual,
       "Find maintenance information",
       dependencies(provider, manyPassages),

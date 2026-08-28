@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ManualDocumentRecord } from "@/lib/manual/manual-types";
-import { AppError } from "@/lib/server/errors";
 
 const manual: ManualDocumentRecord = {
   id: "123e4567-e89b-12d3-a456-426614174000",
@@ -44,6 +43,8 @@ const {
   startConfiguredManualIngestion: vi.fn(),
   enqueueConfiguredManualIngestion: vi.fn(),
 }));
+const { requireOwnerMode } = vi.hoisted(() => ({ requireOwnerMode: vi.fn() }));
+const { getReadableScope } = vi.hoisted(() => ({ getReadableScope: vi.fn() }));
 
 vi.mock("@/lib/data/manual-repository", () => ({
   manualRepository: { findCurrent, getIngestionProgress },
@@ -55,6 +56,12 @@ vi.mock("@/lib/manual/manual-ingestion", () => ({
   startConfiguredManualIngestion,
   enqueueConfiguredManualIngestion,
 }));
+vi.mock("@/lib/server/mutation-guard", () => ({ requireOwnerMode }));
+vi.mock("@/lib/server/read-access", () => ({ getReadableScope }));
+
+import { TEST_SCOPE } from "@/tests/fixtures/test-scope";
+import { OWNER_SCOPE } from "@/lib/server/owner-scope";
+import { AppError } from "@/lib/server/errors";
 
 import { GET, POST } from "@/app/api/manual/route";
 import { POST as POST_INGEST } from "@/app/api/manual/ingest/route";
@@ -62,6 +69,8 @@ import { POST as POST_INGEST } from "@/app/api/manual/ingest/route";
 describe("manual API route boundary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    requireOwnerMode.mockReturnValue(undefined);
+    getReadableScope.mockResolvedValue({ scope: TEST_SCOPE, isOwner: true });
   });
 
   it("returns the current manual metadata and status", async () => {
@@ -107,6 +116,7 @@ describe("manual API route boundary", () => {
     expect(payload.manual).toEqual(expectedApiManual());
     expect(payload.manual).not.toHaveProperty("storageKey");
     expect(uploadConfiguredManual).toHaveBeenCalledWith(
+      OWNER_SCOPE,
       expect.objectContaining({
         fileName: "manual.pdf",
         contentType: "application/pdf",
@@ -205,6 +215,40 @@ describe("manual API route boundary", () => {
       started: true,
       manual: { status: "processing" },
     });
-    expect(enqueueConfiguredManualIngestion).toHaveBeenCalledWith(manual.id);
+    expect(enqueueConfiguredManualIngestion).toHaveBeenCalledWith(OWNER_SCOPE, manual.id);
+  });
+
+  it("rejects a read-only upload before parsing multipart data or touching storage", async () => {
+    requireOwnerMode.mockImplementation(() => {
+      throw new AppError("READ_ONLY_MODE", "This MotoMemory deployment is read-only.", 403);
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/manual", {
+        method: "POST",
+        body: new FormData(),
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "READ_ONLY_MODE" },
+    });
+    expect(uploadConfiguredManual).not.toHaveBeenCalled();
+  });
+
+  it("rejects a read-only OCR request before starting or enqueueing work", async () => {
+    requireOwnerMode.mockImplementation(() => {
+      throw new AppError("READ_ONLY_MODE", "This MotoMemory deployment is read-only.", 403);
+    });
+
+    const response = await POST_INGEST();
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "READ_ONLY_MODE" },
+    });
+    expect(startConfiguredManualIngestion).not.toHaveBeenCalled();
+    expect(enqueueConfiguredManualIngestion).not.toHaveBeenCalled();
   });
 });

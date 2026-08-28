@@ -19,7 +19,7 @@ interface ManualApiPayload {
   manual?: PublicManualDocumentRecord | null;
   progress?: ManualIngestionProgress | null;
   started?: boolean;
-  error?: { message?: string };
+  error?: { code?: string; message?: string };
 }
 
 function errorMessage(payload: ManualApiPayload, fallback: string): string {
@@ -56,9 +56,11 @@ async function fetchManualStatus(): Promise<ManualApiPayload> {
 export function ManualWorkspace({
   initialPageTarget,
   initialPrintedPageLabel,
+  canManage = false,
 }: {
   initialPageTarget: number | null;
   initialPrintedPageLabel: string | null;
+  canManage?: boolean;
 }) {
   const [manual, setManual] = useState<PublicManualDocumentRecord | null>(null);
   const [progress, setProgress] = useState<ManualIngestionProgress | null>(null);
@@ -223,8 +225,8 @@ export function ManualWorkspace({
     return (
       <section className="manual-state-card panel" aria-busy="true" aria-live="polite">
         <p className="eyebrow">Manual status</p>
-        <h2>Checking for the private manual…</h2>
-        <p className="muted-copy">The original document is kept behind the server-side route.</p>
+        <h2>Checking for the source manual…</h2>
+        <p className="muted-copy">The original document is served through the application.</p>
       </section>
     );
   }
@@ -243,6 +245,16 @@ export function ManualWorkspace({
   }
 
   if (!manual) {
+    if (!canManage) {
+      return (
+        <section className="manual-state-card panel" aria-labelledby="manual-missing-heading">
+          <p className="eyebrow">Source manual</p>
+          <h2 id="manual-missing-heading">No manual has been uploaded yet</h2>
+          <p className="muted-copy">The owner has not uploaded a manual for this motorcycle.</p>
+        </section>
+      );
+    }
+
     return (
       <section className="manual-upload-layout">
         <section className="manual-state-card panel" aria-labelledby="manual-missing-heading">
@@ -353,7 +365,7 @@ export function ManualWorkspace({
             ) : null}
           </>
         ) : null}
-        {manual.status !== "processing" ? (
+        {canManage && manual.status !== "processing" ? (
           <button className="button button-outline" type="button" onClick={() => void startProcessing()} disabled={isProcessingAction}>
             {isProcessingAction
               ? "Starting…"
@@ -368,7 +380,7 @@ export function ManualWorkspace({
         {actionError ? <p className="state-feedback state-feedback-error" role="alert">{actionError}</p> : null}
       </section>
 
-      <ManualFactsPanel manual={manual} />
+      <ManualFactsPanel manual={manual} readOnly={!canManage} />
 
       <ManualEvidencePanel manual={manual} />
 

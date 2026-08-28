@@ -20,6 +20,7 @@ vi.mock("@/lib/data/maintenance-repository", () => ({
 
 import { motorcycleRepository } from "@/lib/data/motorcycle-repository";
 import type { MaintenanceRecord } from "@/lib/domain/types";
+import { TEST_SCOPE } from "@/tests/fixtures/test-scope";
 
 const motorcycleRow = {
   id: "gs750",
@@ -124,7 +125,7 @@ describe("motorcycle overview maintenance calculation integration", () => {
     motorcycleRow.current_mileage = mileage;
     history.listMaintenanceRecords.mockResolvedValue(records);
 
-    const overview = await motorcycleRepository.getOverview("gs750");
+    const overview = await motorcycleRepository.getOverview(TEST_SCOPE);
 
     expect(overview.maintenanceOutlook[0]).toMatchObject({
       ...expected,
@@ -134,7 +135,7 @@ describe("motorcycle overview maintenance calculation integration", () => {
       sourcePageStart: 42,
       rawOcrContext: "Engine oil every 4,000 miles",
     });
-    expect(history.listMaintenanceRecords).toHaveBeenCalledWith("gs750");
+    expect(history.listMaintenanceRecords).toHaveBeenCalledWith(TEST_SCOPE);
   });
 
   it("selects the same service event regardless of repository insertion order", async () => {
@@ -143,9 +144,9 @@ describe("motorcycle overview maintenance calculation integration", () => {
     const newer = record({ id: "record-newer", performedMileage: 18_500 });
 
     history.listMaintenanceRecords.mockResolvedValue([older, newer]);
-    const first = await motorcycleRepository.getOverview("gs750");
+    const first = await motorcycleRepository.getOverview(TEST_SCOPE);
     history.listMaintenanceRecords.mockResolvedValue([newer, older]);
-    const second = await motorcycleRepository.getOverview("gs750");
+    const second = await motorcycleRepository.getOverview(TEST_SCOPE);
 
     expect(first.maintenanceOutlook).toEqual(second.maintenanceOutlook);
     expect(first.maintenanceOutlook[0]).toMatchObject({
@@ -158,11 +159,11 @@ describe("motorcycle overview maintenance calculation integration", () => {
   it("recalculates a corrected interval while preserving service and source identity", async () => {
     motorcycleRow.current_mileage = "20000";
     history.listMaintenanceRecords.mockResolvedValue([record()]);
-    const before = await motorcycleRepository.getOverview("gs750");
+    const before = await motorcycleRepository.getOverview(TEST_SCOPE);
 
     definitionRow.interval_value = "2500";
     definitionRow.interval_miles = "2500";
-    const after = await motorcycleRepository.getOverview("gs750");
+    const after = await motorcycleRepository.getOverview(TEST_SCOPE);
 
     expect(before.maintenanceOutlook[0]).toMatchObject({
       definitionId: "maintenance-1",
@@ -180,9 +181,9 @@ describe("motorcycle overview maintenance calculation integration", () => {
   });
 
   it("passes the current motorcycle mileage into every recalculation", async () => {
-    const first = await motorcycleRepository.getOverview("gs750");
+    const first = await motorcycleRepository.getOverview(TEST_SCOPE);
     motorcycleRow.current_mileage = "18000";
-    const second = await motorcycleRepository.getOverview("gs750");
+    const second = await motorcycleRepository.getOverview(TEST_SCOPE);
 
     expect(first.motorcycle.currentMileage).toBe(19700);
     expect(first.maintenanceOutlook[0]?.status).toBe("upcoming");
@@ -197,7 +198,7 @@ describe("motorcycle overview maintenance calculation integration", () => {
   it("returns unknown rather than projecting from a missing interval", async () => {
     definitionRow.interval_miles = "0";
 
-    const overview = await motorcycleRepository.getOverview("gs750");
+    const overview = await motorcycleRepository.getOverview(TEST_SCOPE);
 
     expect(overview.maintenanceOutlook[0]).toMatchObject({
       status: "unknown",

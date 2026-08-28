@@ -50,14 +50,21 @@ const { findCurrent, listMaintenanceFacts, correctMaintenanceFact } = vi.hoisted
 const { getMotorcycleOverview } = vi.hoisted(() => ({
   getMotorcycleOverview: vi.fn(),
 }));
+const { requireOwnerMode } = vi.hoisted(() => ({ requireOwnerMode: vi.fn() }));
+const { getReadableScope } = vi.hoisted(() => ({ getReadableScope: vi.fn() }));
 
 vi.mock("@/lib/data/manual-repository", () => ({
   manualRepository: { findCurrent, listMaintenanceFacts, correctMaintenanceFact },
 }));
 vi.mock("@/lib/data/motorcycle-repository", () => ({
-  MOTORCYCLE_ID: "gs750",
   getMotorcycleOverview,
 }));
+vi.mock("@/lib/server/mutation-guard", () => ({ requireOwnerMode }));
+vi.mock("@/lib/server/read-access", () => ({ getReadableScope }));
+
+import { TEST_SCOPE } from "@/tests/fixtures/test-scope";
+import { OWNER_SCOPE } from "@/lib/server/owner-scope";
+import { AppError } from "@/lib/server/errors";
 
 import { GET } from "@/app/api/manual/facts/route";
 import { PATCH } from "@/app/api/manual/facts/[factId]/route";
@@ -65,6 +72,8 @@ import { PATCH } from "@/app/api/manual/facts/[factId]/route";
 describe("manual maintenance fact routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    requireOwnerMode.mockReturnValue(undefined);
+    getReadableScope.mockResolvedValue({ scope: TEST_SCOPE, isOwner: true });
     findCurrent.mockResolvedValue(manual);
     listMaintenanceFacts.mockResolvedValue([fact]);
     correctMaintenanceFact.mockResolvedValue({ ...fact, intervalValue: 2500, intervalMiles: 2500, origin: "rider_corrected", correctedAt: new Date(0).toISOString() });
@@ -96,7 +105,7 @@ describe("manual maintenance fact routes", () => {
 
     expect(response.status).toBe(200);
     expect(correctMaintenanceFact).toHaveBeenCalledWith(
-      "gs750",
+      OWNER_SCOPE,
       manual.id,
       fact.id,
       { intervalValue: 2500 },
@@ -106,6 +115,28 @@ describe("manual maintenance fact routes", () => {
       maintenanceOutlook: [{ dueMileage: 20_000 }],
     });
     expect(getMotorcycleOverview).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a read-only correction before reading the body or touching the fact", async () => {
+    requireOwnerMode.mockImplementation(() => {
+      throw new AppError("READ_ONLY_MODE", "This MotoMemory deployment is read-only.", 403);
+    });
+
+    const response = await PATCH(
+      new Request("http://localhost/api/manual/facts/223e4567-e89b-12d3-a456-426614174000", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: "not-json",
+      }),
+      { params: Promise.resolve({ factId: fact.id }) },
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "READ_ONLY_MODE" },
+    });
+    expect(findCurrent).not.toHaveBeenCalled();
+    expect(correctMaintenanceFact).not.toHaveBeenCalled();
   });
 
   it("rejects unknown correction fields before touching the fact", async () => {

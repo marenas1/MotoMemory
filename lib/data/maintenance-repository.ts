@@ -1,7 +1,9 @@
 import "server-only";
 
-import { Pool, type PoolClient, type QueryResultRow } from "pg";
+import { type QueryResultRow } from "pg";
 
+import { getDatabasePool } from "@/lib/data/database";
+import { executeOwnerSave } from "@/lib/data/owner-save-coordinator";
 import {
   MaintenanceRecordValidationError,
   validateMaintenanceRecordInput,
@@ -15,6 +17,7 @@ import type {
   UpdateMaintenanceRecordInput,
 } from "@/lib/domain/types";
 import { buildManualCitationHref } from "@/lib/manual/manual-citations";
+import type { DataScope } from "@/lib/server/data-scope";
 import { AppError } from "@/lib/server/errors";
 
 interface MaintenanceRecordRow extends QueryResultRow {
@@ -53,28 +56,6 @@ interface MaintenanceDefinitionRow extends QueryResultRow {
   source_ocr_context: string | null;
   origin: "ocr" | "rider_corrected" | null;
   corrected_at: Date | string | null;
-}
-
-let pool: Pool | undefined;
-
-function getPool(): Pool {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new AppError(
-      "INVALID_CONFIGURATION",
-      "DATABASE_URL is not configured for the local app.",
-      503,
-    );
-  }
-
-  pool ??= new Pool({
-    connectionString,
-    max: 5,
-    idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 5_000,
-  });
-
-  return pool;
 }
 
 function parseDatabaseNumber(
@@ -241,25 +222,26 @@ function recordNotFound(): AppError {
 
 export interface MaintenanceRecordRepository {
   listActiveMaintenanceDefinitions(
-    motorcycleId: string,
+    scope: DataScope,
   ): Promise<MaintenanceDefinition[]>;
-  listMaintenanceRecords(motorcycleId: string): Promise<MaintenanceRecord[]>;
+  listMaintenanceRecords(scope: DataScope): Promise<MaintenanceRecord[]>;
   createMaintenanceRecord(
-    motorcycleId: string,
+    scope: DataScope,
     input: CreateMaintenanceRecordInput,
   ): Promise<MaintenanceRecord>;
   updateMaintenanceRecord(
-    motorcycleId: string,
+    scope: DataScope,
     recordId: string,
     input: UpdateMaintenanceRecordInput,
   ): Promise<MaintenanceRecord>;
-  deleteMaintenanceRecord(motorcycleId: string, recordId: string): Promise<void>;
+  deleteMaintenanceRecord(scope: DataScope, recordId: string): Promise<void>;
 }
 
 const postgresMaintenanceRecordRepository: MaintenanceRecordRepository = {
-  async listActiveMaintenanceDefinitions(motorcycleId) {
+  async listActiveMaintenanceDefinitions(scope) {
+    const motorcycleId = scope.motorcycleId;
     try {
-      const result = await getPool().query<MaintenanceDefinitionRow>(
+      const result = await getDatabasePool().query<MaintenanceDefinitionRow>(
         `select id, motorcycle_id, name, interval_value, interval_unit,
                 interval_miles, due_window_miles, status, source, notes,
                 source_manual_id, source_page_start, source_page_end,
@@ -278,9 +260,10 @@ const postgresMaintenanceRecordRepository: MaintenanceRecordRepository = {
     }
   },
 
-  async listMaintenanceRecords(motorcycleId) {
+  async listMaintenanceRecords(scope) {
+    const motorcycleId = scope.motorcycleId;
     try {
-      const result = await getPool().query<MaintenanceRecordRow>(
+      const result = await getDatabasePool().query<MaintenanceRecordRow>(
         `select ${maintenanceRecordColumns()}
            from public.maintenance_records
           where motorcycle_id = $1
@@ -295,203 +278,195 @@ const postgresMaintenanceRecordRepository: MaintenanceRecordRepository = {
     }
   },
 
-  async createMaintenanceRecord(motorcycleId, input) {
-    let client: PoolClient | undefined;
-
+  async createMaintenanceRecord(scope, input) {
+    const motorcycleId = scope.motorcycleId;
     try {
       const normalized = validateMaintenanceRecordInput(input);
-      client = await getPool().connect();
-      await client.query("begin");
-
-      const motorcycleResult = await client.query<MotorcycleMileageRow>(
-        `select current_mileage
-           from public.motorcycle_state
-          where id = $1
-          for update`,
-        [motorcycleId],
-      );
-      const motorcycle = motorcycleResult.rows[0];
-      if (!motorcycle) {
-        throw new AppError(
-          "MOTORCYCLE_NOT_FOUND",
-          "The motorcycle state was not found.",
-          404,
+      return await executeOwnerSave(scope, async (client) => {
+        const motorcycleResult = await client.query<MotorcycleMileageRow>(
+          `select current_mileage
+             from public.motorcycle_state
+            where id = $1
+            for update`,
+          [motorcycleId],
         );
-      }
+        const motorcycle = motorcycleResult.rows[0];
+        if (!motorcycle) {
+          throw new AppError(
+            "MOTORCYCLE_NOT_FOUND",
+            "The motorcycle state was not found.",
+            404,
+          );
+        }
 
-      const currentMileage = parseDatabaseNumber(
-        motorcycle.current_mileage,
-        "current mileage",
-      );
-      validatePerformedMileageAgainstCurrentMileage(
-        Number(normalized.performedMileage),
-        currentMileage,
-      );
-
-      const result = await client.query<MaintenanceRecordRow>(
-        `insert into public.maintenance_records (
-           motorcycle_id, definition_id, service_type, performed_mileage,
-           performed_at, notes, parts, cost
-         )
-         values ($1, $2, $3, $4, $5, $6, $7, $8)
-         returning ${maintenanceRecordColumns()}`,
-        [
-          motorcycleId,
-          normalized.definitionId,
-          normalized.serviceType,
-          normalized.performedMileage,
-          normalized.performedAt,
-          normalized.notes,
-          normalized.parts,
-          normalized.cost,
-        ],
-      );
-      const row = result.rows[0];
-      if (!row) {
-        throw new AppError(
-          "UPDATE_FAILED",
-          "The maintenance record was not returned after saving.",
+        const currentMileage = parseDatabaseNumber(
+          motorcycle.current_mileage,
+          "current mileage",
         );
-      }
+        validatePerformedMileageAgainstCurrentMileage(
+          Number(normalized.performedMileage),
+          currentMileage,
+        );
 
-      await client.query("commit");
-      return mapMaintenanceRecord(row);
+        const result = await client.query<MaintenanceRecordRow>(
+          `insert into public.maintenance_records (
+             motorcycle_id, definition_id, service_type, performed_mileage,
+             performed_at, notes, parts, cost
+           )
+           values ($1, $2, $3, $4, $5, $6, $7, $8)
+           returning ${maintenanceRecordColumns()}`,
+          [
+            motorcycleId,
+            normalized.definitionId,
+            normalized.serviceType,
+            normalized.performedMileage,
+            normalized.performedAt,
+            normalized.notes,
+            normalized.parts,
+            normalized.cost,
+          ],
+        );
+        const row = result.rows[0];
+        if (!row) {
+          throw new AppError(
+            "UPDATE_FAILED",
+            "The maintenance record was not returned after saving.",
+          );
+        }
+
+        return { result: mapMaintenanceRecord(row), changed: true };
+      });
     } catch (error) {
-      await client?.query("rollback").catch(() => undefined);
       throw mapDatabaseError(error, "write");
-    } finally {
-      client?.release();
     }
   },
 
-  async updateMaintenanceRecord(motorcycleId, recordId, input) {
-    let client: PoolClient | undefined;
-
+  async updateMaintenanceRecord(scope, recordId, input) {
+    const motorcycleId = scope.motorcycleId;
     try {
       const normalizedUpdate = validateMaintenanceRecordUpdateInput(input);
-      client = await getPool().connect();
-      await client.query("begin");
-
-      const motorcycleResult = await client.query<MotorcycleMileageRow>(
-        `select current_mileage
-           from public.motorcycle_state
-          where id = $1
-          for update`,
-        [motorcycleId],
-      );
-      const motorcycle = motorcycleResult.rows[0];
-      if (!motorcycle) {
-        throw new AppError(
-          "MOTORCYCLE_NOT_FOUND",
-          "The motorcycle state was not found.",
-          404,
+      return await executeOwnerSave(scope, async (client) => {
+        const motorcycleResult = await client.query<MotorcycleMileageRow>(
+          `select current_mileage
+             from public.motorcycle_state
+            where id = $1
+            for update`,
+          [motorcycleId],
         );
-      }
+        const motorcycle = motorcycleResult.rows[0];
+        if (!motorcycle) {
+          throw new AppError(
+            "MOTORCYCLE_NOT_FOUND",
+            "The motorcycle state was not found.",
+            404,
+          );
+        }
 
-      const currentResult = await client.query<MaintenanceRecordRow>(
-        `select ${maintenanceRecordColumns()}
-           from public.maintenance_records
-          where id = $1
+        const currentResult = await client.query<MaintenanceRecordRow>(
+          `select ${maintenanceRecordColumns()}
+             from public.maintenance_records
+            where id = $1
             and motorcycle_id = $2
-          for update`,
-        [recordId, motorcycleId],
-      );
-      const currentRow = currentResult.rows[0];
-      if (!currentRow) {
-        throw recordNotFound();
-      }
+            for update`,
+          [recordId, motorcycleId],
+        );
+        const currentRow = currentResult.rows[0];
+        if (!currentRow) {
+          throw recordNotFound();
+        }
 
-      const current = mapMaintenanceRecord(currentRow);
-      const merged = validateMaintenanceRecordInput({
-        definitionId:
-          normalizedUpdate.definitionId === undefined
-            ? current.definitionId
-            : normalizedUpdate.definitionId,
-        serviceType: normalizedUpdate.serviceType ?? current.serviceType,
-        performedMileage:
-          normalizedUpdate.performedMileage ?? current.performedMileage,
-        performedAt:
-          normalizedUpdate.performedAt === undefined
-            ? current.performedAt
-            : normalizedUpdate.performedAt,
-        notes:
-          normalizedUpdate.notes === undefined
-            ? current.notes
-            : normalizedUpdate.notes,
-        parts:
-          normalizedUpdate.parts === undefined
-            ? current.parts
-            : normalizedUpdate.parts,
-        cost:
-          normalizedUpdate.cost === undefined
-            ? current.cost
-            : normalizedUpdate.cost,
+        const current = mapMaintenanceRecord(currentRow);
+        const merged = validateMaintenanceRecordInput({
+          definitionId:
+            normalizedUpdate.definitionId === undefined
+              ? current.definitionId
+              : normalizedUpdate.definitionId,
+          serviceType: normalizedUpdate.serviceType ?? current.serviceType,
+          performedMileage:
+            normalizedUpdate.performedMileage ?? current.performedMileage,
+          performedAt:
+            normalizedUpdate.performedAt === undefined
+              ? current.performedAt
+              : normalizedUpdate.performedAt,
+          notes:
+            normalizedUpdate.notes === undefined
+              ? current.notes
+              : normalizedUpdate.notes,
+          parts:
+            normalizedUpdate.parts === undefined
+              ? current.parts
+              : normalizedUpdate.parts,
+          cost:
+            normalizedUpdate.cost === undefined
+              ? current.cost
+              : normalizedUpdate.cost,
+        });
+
+        const currentMileage = parseDatabaseNumber(
+          motorcycle.current_mileage,
+          "current mileage",
+        );
+        validatePerformedMileageAgainstCurrentMileage(
+          Number(merged.performedMileage),
+          currentMileage,
+        );
+
+        const result = await client.query<MaintenanceRecordRow>(
+          `update public.maintenance_records
+              set definition_id = $3,
+                  service_type = $4,
+                  performed_mileage = $5,
+                  performed_at = $6,
+                  notes = $7,
+                  parts = $8,
+                  cost = $9,
+                  updated_at = now()
+            where id = $1
+            and motorcycle_id = $2
+            returning ${maintenanceRecordColumns()}`,
+          [
+            recordId,
+            motorcycleId,
+            merged.definitionId,
+            merged.serviceType,
+            merged.performedMileage,
+            merged.performedAt,
+            merged.notes,
+            merged.parts,
+            merged.cost,
+          ],
+        );
+        const row = result.rows[0];
+        if (!row) {
+          throw new AppError(
+            "UPDATE_FAILED",
+            "The maintenance record was not returned after updating.",
+          );
+        }
+
+        return { result: mapMaintenanceRecord(row), changed: true };
       });
-
-      const currentMileage = parseDatabaseNumber(
-        motorcycle.current_mileage,
-        "current mileage",
-      );
-      validatePerformedMileageAgainstCurrentMileage(
-        Number(merged.performedMileage),
-        currentMileage,
-      );
-
-      const result = await client.query<MaintenanceRecordRow>(
-        `update public.maintenance_records
-            set definition_id = $3,
-                service_type = $4,
-                performed_mileage = $5,
-                performed_at = $6,
-                notes = $7,
-                parts = $8,
-                cost = $9,
-                updated_at = now()
-          where id = $1
-            and motorcycle_id = $2
-          returning ${maintenanceRecordColumns()}`,
-        [
-          recordId,
-          motorcycleId,
-          merged.definitionId,
-          merged.serviceType,
-          merged.performedMileage,
-          merged.performedAt,
-          merged.notes,
-          merged.parts,
-          merged.cost,
-        ],
-      );
-      const row = result.rows[0];
-      if (!row) {
-        throw new AppError(
-          "UPDATE_FAILED",
-          "The maintenance record was not returned after updating.",
-        );
-      }
-
-      await client.query("commit");
-      return mapMaintenanceRecord(row);
     } catch (error) {
-      await client?.query("rollback").catch(() => undefined);
       throw mapDatabaseError(error, "write");
-    } finally {
-      client?.release();
     }
   },
 
-  async deleteMaintenanceRecord(motorcycleId, recordId) {
+  async deleteMaintenanceRecord(scope, recordId) {
+    const motorcycleId = scope.motorcycleId;
     try {
-      const result = await getPool().query<{ id: string }>(
-        `delete from public.maintenance_records
-          where id = $1
+      await executeOwnerSave(scope, async (client) => {
+        const result = await client.query<{ id: string }>(
+          `delete from public.maintenance_records
+            where id = $1
             and motorcycle_id = $2
-          returning id`,
-        [recordId, motorcycleId],
-      );
-      if (!result.rows[0]) {
-        throw recordNotFound();
-      }
+            returning id`,
+          [recordId, motorcycleId],
+        );
+        if (!result.rows[0]) {
+          throw recordNotFound();
+        }
+        return { result: undefined, changed: true };
+      });
     } catch (error) {
       throw mapDatabaseError(error, "write");
     }

@@ -20,6 +20,7 @@ import type {
 } from "@/lib/manual/manual-types";
 import { searchManualChunks } from "@/lib/manual/retrieval";
 import { AppError } from "@/lib/server/errors";
+import type { DataScope } from "@/lib/server/data-scope";
 
 export const MAX_ANSWER_PASSAGES = 8;
 export const MAX_ANSWER_EVIDENCE_CHARACTERS = 12_000;
@@ -179,6 +180,7 @@ function validateProviderCitations(
 }
 
 export async function answerManualQuestion(
+  scope: DataScope,
   manual: ManualDocumentRecord,
   question: string,
   dependencies: ManualAnswerDependencies = {
@@ -202,6 +204,7 @@ export async function answerManualQuestion(
     pageCount: manual.pageCount,
   };
   const retrievedPassages = await searchManualChunks(
+    scope,
     manual.id,
     parsedQuestion.data.question,
     dependencies,

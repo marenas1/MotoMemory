@@ -24,15 +24,20 @@ const { findCurrent } = vi.hoisted(() => ({
 const { answerManualQuestion } = vi.hoisted(() => ({
   answerManualQuestion: vi.fn(),
 }));
+const { getReadableScope } = vi.hoisted(() => ({ getReadableScope: vi.fn() }));
 
 vi.mock("@/lib/data/manual-repository", () => ({ manualRepository: { findCurrent } }));
 vi.mock("@/lib/manual/manual-answering", () => ({ answerManualQuestion }));
+vi.mock("@/lib/server/read-access", () => ({ getReadableScope }));
+
+import { TEST_SCOPE } from "@/tests/fixtures/test-scope";
 
 import { POST } from "@/app/api/manual/questions/route";
 
 describe("manual question route boundary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getReadableScope.mockResolvedValue({ scope: TEST_SCOPE, isOwner: true });
     findCurrent.mockResolvedValue(manual);
     answerManualQuestion.mockResolvedValue({
       state: "provider_unavailable",
@@ -76,6 +81,7 @@ describe("manual question route boundary", () => {
       manual: { id: manual.id },
     });
     expect(answerManualQuestion).toHaveBeenCalledWith(
+      TEST_SCOPE,
       manual,
       "What does the manual say?",
     );

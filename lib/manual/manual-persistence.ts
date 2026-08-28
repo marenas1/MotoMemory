@@ -16,9 +16,10 @@ import type {
 } from "@/lib/data/manual-repository";
 import type { ManualObjectStorage } from "@/lib/manual/manual-storage";
 import { AppError } from "@/lib/server/errors";
+import type { DataScope } from "@/lib/server/data-scope";
 
 export interface PersistManualDocumentInput {
-  motorcycleId: string;
+  scope: DataScope;
   fileName: string;
   contentType: string;
   bytes: Uint8Array;
@@ -72,10 +73,10 @@ export async function persistManualDocument(
     sha256: hashManualBytes(input.bytes),
     pageCount: input.pageCount,
   });
-  const storageKey = buildManualStorageKey(input.motorcycleId, documentId);
+  const storageKey = buildManualStorageKey(input.scope.motorcycleId, documentId);
 
   const identicalDocument = await dependencies.repository.findBySha256(
-    input.motorcycleId,
+    input.scope,
     metadata.sha256,
   );
   if (identicalDocument) {
@@ -87,7 +88,7 @@ export async function persistManualDocument(
   }
 
   const currentDocument = await dependencies.repository.findCurrent(
-    input.motorcycleId,
+    input.scope,
   );
   if (currentDocument) {
     throw new AppError(
@@ -110,7 +111,7 @@ export async function persistManualDocument(
 
   const repositoryInput: CreateManualDocumentInput = {
     id: documentId,
-    motorcycleId: input.motorcycleId,
+    scope: input.scope,
     storageKey,
     ...metadata,
   };

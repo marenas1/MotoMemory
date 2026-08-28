@@ -27,8 +27,8 @@ test("accepts, explains, corrects, rejects, and deletes a linked service record"
   page,
 }) => {
   test.skip(
-    !process.env.DATABASE_URL,
-    "Requires the configured private database and a source-linked maintenance definition.",
+    process.env.MOTOMEMORY_OWNER_E2E !== "1",
+    "Requires the configured private owner and a source-linked maintenance definition.",
   );
 
   await page.goto("/");

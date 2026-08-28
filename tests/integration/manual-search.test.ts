@@ -22,16 +22,21 @@ const { findCurrent, searchChunks } = vi.hoisted(() => ({
   findCurrent: vi.fn(),
   searchChunks: vi.fn(),
 }));
+const { getReadableScope } = vi.hoisted(() => ({ getReadableScope: vi.fn() }));
 
 vi.mock("@/lib/data/manual-repository", () => ({
   manualRepository: { findCurrent, searchChunks },
 }));
+vi.mock("@/lib/server/read-access", () => ({ getReadableScope }));
+
+import { TEST_SCOPE } from "@/tests/fixtures/test-scope";
 
 import { POST } from "@/app/api/manual/search/route";
 
 describe("manual search route boundary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getReadableScope.mockResolvedValue({ scope: TEST_SCOPE, isOwner: true });
     findCurrent.mockResolvedValue(manual);
   });
 
@@ -64,7 +69,7 @@ describe("manual search route boundary", () => {
       manualId: manual.id,
       passages: [{ pageStart: 34, printedPageStart: "31" }],
     });
-    expect(searchChunks).toHaveBeenCalledWith(manual.id, "oil interval", 8);
+    expect(searchChunks).toHaveBeenCalledWith(TEST_SCOPE, manual.id, "oil interval", 8);
   });
 
   it("rejects an empty query before searching", async () => {

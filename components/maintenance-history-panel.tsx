@@ -37,6 +37,7 @@ class HistoryRequestError extends Error {
   constructor(
     readonly kind: RequestFailureKind,
     message: string,
+    readonly code?: string,
   ) {
     super(message);
     this.name = "HistoryRequestError";
@@ -44,7 +45,7 @@ class HistoryRequestError extends Error {
 }
 
 interface ApiErrorPayload {
-  error?: { message?: string };
+  error?: { code?: string; message?: string };
 }
 
 function apiErrorMessage(payload: unknown, fallback: string): string {
@@ -63,7 +64,15 @@ async function fetchMaintenanceHistory(): Promise<{
   const response = await fetch("/api/maintenance/records", { cache: "no-store" });
   const payload: unknown = await response.json();
   if (!response.ok) {
-    throw new Error(apiErrorMessage(payload, "Maintenance history could not be loaded."));
+    const code =
+      typeof payload === "object" && payload !== null && "error" in payload
+        ? (payload as ApiErrorPayload).error?.code
+        : undefined;
+    throw new HistoryRequestError(
+      response.status >= 400 && response.status < 500 ? "rejected" : "failed",
+      apiErrorMessage(payload, "Maintenance history could not be loaded."),
+      code,
+    );
   }
 
   const parsed = maintenanceHistoryResponseSchema.safeParse(payload);
@@ -202,6 +211,9 @@ async function requestFailure(
   throw new HistoryRequestError(
     response.status >= 400 && response.status < 500 ? "rejected" : "failed",
     apiErrorMessage(payload, fallback),
+    typeof payload === "object" && payload !== null && "error" in payload
+      ? (payload as ApiErrorPayload).error?.code
+      : undefined,
   );
 }
 
@@ -370,9 +382,11 @@ export function MaintenanceHistoryForm({
 
 export function MaintenanceHistoryPanel({
   currentMileage,
+  readOnly = true,
   onHistoryChanged,
 }: {
   currentMileage: number;
+  readOnly?: boolean;
   onHistoryChanged?: () => Promise<void>;
 }) {
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
@@ -433,17 +447,17 @@ export function MaintenanceHistoryPanel({
     };
   }, []);
 
-  async function saveRecord(input: Record<string, unknown>) {
+  async function saveRecord(input: Record<string, unknown>, targetEditingId = editingId) {
     setBusy(true);
     setFeedback(null);
 
     try {
       const response = await fetch(
-        editingId
-          ? `/api/maintenance/records/${editingId}`
+        targetEditingId
+          ? `/api/maintenance/records/${targetEditingId}`
           : "/api/maintenance/records",
         {
-          method: editingId ? "PATCH" : "POST",
+          method: targetEditingId ? "PATCH" : "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(input),
         },
@@ -452,7 +466,7 @@ export function MaintenanceHistoryPanel({
       if (!response.ok) {
         await requestFailure(
           new Response(JSON.stringify(payload), { status: response.status }),
-          editingId ? "The maintenance record could not be updated." : "The maintenance record could not be saved.",
+          targetEditingId ? "The maintenance record could not be updated." : "The maintenance record could not be saved.",
         );
       }
 
@@ -464,14 +478,14 @@ export function MaintenanceHistoryPanel({
       const record = parsed.data.record;
       setRecords((current) =>
         sortRecords(
-          editingId
+          targetEditingId
             ? current.map((item) => (item.id === record.id ? record : item))
             : [record, ...current],
         ),
       );
       setFeedback({
         kind: "saved",
-        message: editingId ? "Maintenance record updated." : "Maintenance record saved.",
+        message: targetEditingId ? "Maintenance record updated." : "Maintenance record saved.",
       });
       let refreshError: string | null = null;
       try {
@@ -516,8 +530,8 @@ export function MaintenanceHistoryPanel({
     setFeedback(null);
   }
 
-  async function deleteRecord(recordId: string) {
-    if (!window.confirm("Delete this maintenance record? This does not change manual facts.")) {
+  async function deleteRecord(recordId: string, confirmed = false) {
+    if (!confirmed && !window.confirm("Delete this maintenance record? This does not change manual facts.")) {
       return;
     }
 
@@ -582,8 +596,16 @@ export function MaintenanceHistoryPanel({
         <span className="panel-icon" aria-hidden="true">↺</span>
       </div>
       <p className="maintenance-history-intro">
-        Add one maintenance item at a time. Mileage is checked against the current odometer; optional details stay with the event.
+        {readOnly
+          ? "Recorded service history is visible here. Add, edit, or delete records from the private local owner application."
+          : "Add one maintenance item at a time. Mileage is checked against the current odometer; optional details stay with the event."}
       </p>
+
+      {readOnly ? (
+        <div className="owner-permission-notice" role="note">
+          <p>This deployed view is read-only. Run the local owner application to manage service history.</p>
+        </div>
+      ) : null}
 
       {loading ? <p className="muted-copy" role="status">Loading service history…</p> : null}
       {!loading && loadError ? (
@@ -597,7 +619,7 @@ export function MaintenanceHistoryPanel({
 
       {!loading && !loadError ? (
         <>
-          <div className="maintenance-history-form-card">
+          {!readOnly ? <div className="maintenance-history-form-card">
             <div className="maintenance-history-subheading">
               <div>
                 <p className="card-kicker">{editingId ? "Correct a record" : "New record"}</p>
@@ -616,14 +638,13 @@ export function MaintenanceHistoryPanel({
               onRejected={(message) => setFeedback({ kind: "rejected", message: `Record rejected: ${message}` })}
               onSubmit={saveRecord}
             />
-          </div>
+          </div> : null}
 
           {feedback ? (
             <StateFeedback variant={feedback.kind === "saved" ? "success" : "error"}>
               {feedback.message}
             </StateFeedback>
           ) : null}
-
           <div className="maintenance-history-list" aria-live="polite">
             <div className="maintenance-history-list-heading">
               <p className="eyebrow">Recorded events</p>
@@ -654,14 +675,16 @@ export function MaintenanceHistoryPanel({
                       {record.parts?.length ? <div><dt>Parts</dt><dd>{record.parts.join(" · ")}</dd></div> : null}
                     </dl>
                     {record.notes ? <p className="maintenance-history-notes">{record.notes}</p> : null}
-                    <div className="maintenance-history-record-actions">
-                      <button className="button button-outline" type="button" onClick={() => beginEdit(record)} disabled={busy || busyRecordId !== null}>
-                        Edit
-                      </button>
-                      <button className="button button-danger" type="button" onClick={() => void deleteRecord(record.id)} disabled={busy || busyRecordId !== null}>
-                        {busyRecordId === record.id ? "Deleting…" : "Delete"}
-                      </button>
-                    </div>
+                    {!readOnly ? (
+                      <div className="maintenance-history-record-actions">
+                        <button className="button button-outline" type="button" onClick={() => beginEdit(record)} disabled={busy || busyRecordId !== null}>
+                          Edit
+                        </button>
+                        <button className="button button-danger" type="button" onClick={() => void deleteRecord(record.id)} disabled={busy || busyRecordId !== null}>
+                          {busyRecordId === record.id ? "Deleting…" : "Delete"}
+                        </button>
+                      </div>
+                    ) : null}
                   </article>
                 );
               })

@@ -39,8 +39,10 @@ function scrollToSection(id: string) {
 
 export function MotorcycleMainView({
   initialOverview,
+  canManage = false,
 }: {
   initialOverview: MotorcycleOverview;
+  canManage?: boolean;
 }) {
   const [overview, setOverview] = useState(initialOverview);
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
@@ -96,17 +98,19 @@ export function MotorcycleMainView({
 
   return (
     <main className="dashboard-shell" id="dashboard">
-      <MotorcycleNavigation active="dashboard" />
+      <MotorcycleNavigation active="dashboard" canManage={canManage} />
 
       <div className="dashboard-content">
         <div className="dashboard-stage">
           <header className="topbar">
             <div>
               <p className="eyebrow">MotoMemory dashboard</p>
-              <h1>Welcome back.</h1>
-              <p className="topbar-subtitle">Here&apos;s your bike at a glance.</p>
+              <h1>{canManage ? "Welcome back." : "Motorcycle memory."}</h1>
+              <p className="topbar-subtitle">
+                {canManage ? "Here&apos;s your bike at a glance." : "A live, read-only view of the motorcycle workspace."}
+              </p>
             </div>
-            <span className="scope-label">Personal <b aria-hidden="true">·</b> one motorcycle</span>
+            <span className="scope-label">{canManage ? "Owner · editable" : "Guest · read only"}</span>
           </header>
 
           <section className="hero-grid" aria-labelledby="motorcycle-name">
@@ -151,9 +155,13 @@ export function MotorcycleMainView({
                   <dd>{motorcycle.lastMileageUpdateOrigin ?? "Seeded state"}</dd>
                 </div>
               </dl>
-              <button className="text-action" type="button" onClick={() => scrollToSection("mileage-update")}>
-                Set current mileage <span aria-hidden="true">→</span>
-              </button>
+              {canManage ? (
+                <button className="text-action" type="button" onClick={() => scrollToSection("mileage-update")}>
+                  Set current mileage <span aria-hidden="true">→</span>
+                </button>
+              ) : (
+                <span className="text-action">Read-only deployment</span>
+              )}
             </section>
           </section>
         </div>
@@ -169,20 +177,28 @@ export function MotorcycleMainView({
               </div>
               <span className="panel-icon" aria-hidden="true">↗</span>
             </div>
-            <MileageForm
-              currentMileage={motorcycle.currentMileage}
-              disabled={saveState.status === "pending"}
-              onSubmit={saveMileage}
-            />
-            {saveState.status === "pending" ? (
-              <StateFeedback variant="info">Saving mileage…</StateFeedback>
-            ) : null}
-            {saveState.status === "success" ? (
-              <StateFeedback variant="success">{saveState.message}</StateFeedback>
-            ) : null}
-            {saveState.status === "error" ? (
-              <StateFeedback variant="error">{saveState.message}</StateFeedback>
-            ) : null}
+            {canManage ? (
+              <>
+                <MileageForm
+                  currentMileage={motorcycle.currentMileage}
+                  disabled={saveState.status === "pending"}
+                  onSubmit={saveMileage}
+                />
+                {saveState.status === "pending" ? (
+                  <StateFeedback variant="info">Saving mileage…</StateFeedback>
+                ) : null}
+                {saveState.status === "success" ? (
+                  <StateFeedback variant="success">{saveState.message}</StateFeedback>
+                ) : null}
+                {saveState.status === "error" ? (
+                  <StateFeedback variant="error">{saveState.message}</StateFeedback>
+                ) : null}
+              </>
+            ) : (
+              <div className="owner-permission-notice" role="note">
+                <p>Viewing the live motorcycle state is available here. Changes are made from the private local owner application.</p>
+              </div>
+            )}
 
             <div className="quick-actions" aria-labelledby="quick-actions-heading">
               <div className="quick-actions-heading">
@@ -190,9 +206,15 @@ export function MotorcycleMainView({
                 <span className="quick-actions-note">Phase 1</span>
               </div>
               <div className="quick-actions-grid">
-                <button className="action-tile" type="button" onClick={() => scrollToSection("mileage-update")}>
-                  Update mileage <span aria-hidden="true">→</span>
-                </button>
+                {canManage ? (
+                  <button className="action-tile" type="button" onClick={() => scrollToSection("mileage-update")}>
+                    Update mileage <span aria-hidden="true">→</span>
+                  </button>
+                ) : (
+                  <div className="action-tile action-tile-disabled" role="note">
+                    Read-only deployment
+                  </div>
+                )}
                 <button className="action-tile" type="button" onClick={() => scrollToSection("maintenance-overview")}>
                   Review upcoming <span aria-hidden="true">→</span>
                 </button>
@@ -203,6 +225,7 @@ export function MotorcycleMainView({
 
         <MaintenanceHistoryPanel
           currentMileage={motorcycle.currentMileage}
+          readOnly={!canManage}
           onHistoryChanged={refreshOverviewAfterHistoryChange}
         />
 

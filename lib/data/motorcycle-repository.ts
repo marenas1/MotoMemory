@@ -1,7 +1,8 @@
 import "server-only";
 
-import { Pool, type PoolClient, type QueryResultRow } from "pg";
+import { type QueryResultRow } from "pg";
 
+import { getDatabasePool } from "@/lib/data/database";
 import { maintenanceRepository } from "@/lib/data/maintenance-repository";
 import { calculateMaintenanceOutlooks } from "@/lib/domain/maintenance";
 import type {
@@ -10,9 +11,9 @@ import type {
   MotorcycleState,
 } from "@/lib/domain/types";
 import { buildManualCitationHref } from "@/lib/manual/manual-citations";
+import { executeOwnerSave } from "@/lib/data/owner-save-coordinator";
+import type { DataScope } from "@/lib/server/data-scope";
 import { AppError } from "@/lib/server/errors";
-
-export const MOTORCYCLE_ID = "gs750";
 
 type MotorcycleRow = QueryResultRow & {
   id: string;
@@ -56,28 +57,6 @@ type UpdateRow = QueryResultRow & {
   updated_at: Date;
   last_mileage_update_origin: "manual" | null;
 };
-
-let pool: Pool | undefined;
-
-function getPool(): Pool {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new AppError(
-      "INVALID_CONFIGURATION",
-      "DATABASE_URL is not configured for the local app.",
-      503,
-    );
-  }
-
-  pool ??= new Pool({
-    connectionString,
-    max: 5,
-    idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 5_000,
-  });
-
-  return pool;
-}
 
 function parseNumeric(value: string | number): number {
   const parsed = Number(value);
@@ -165,18 +144,19 @@ function mapDatabaseError(error: unknown, operation: "read" | "update"): AppErro
 }
 
 export interface MotorcycleRepository {
-  getOverview(motorcycleId: string): Promise<MotorcycleOverview>;
+  getOverview(scope: DataScope): Promise<MotorcycleOverview>;
   updateMileage(
-    motorcycleId: string,
+    scope: DataScope,
     mileage: number,
     expectedCurrentMileage?: number,
   ): Promise<MotorcycleOverview>;
 }
 
 const postgresRepository: MotorcycleRepository = {
-  async getOverview(motorcycleId) {
+  async getOverview(scope) {
+    const motorcycleId = scope.motorcycleId;
     try {
-      const database = getPool();
+      const database = getDatabasePool();
       const motorcycleResult = await database.query<MotorcycleRow>(
         `select id, make, model, model_year, current_mileage, mileage_unit,
                 visual_state, visual_emoji, last_mileage_update_at,
@@ -211,7 +191,7 @@ const postgresRepository: MotorcycleRepository = {
       const motorcycle = mapMotorcycle(motorcycleRow);
       const definitions = maintenanceResult.rows.map(mapMaintenance);
       const records = await maintenanceRepository.listMaintenanceRecords(
-        motorcycleId,
+        scope,
       );
 
       return {
@@ -227,14 +207,9 @@ const postgresRepository: MotorcycleRepository = {
     }
   },
 
-  async updateMileage(motorcycleId, mileage, expectedCurrentMileage) {
-    let client: PoolClient | undefined;
-
-    try {
-      const database = getPool();
-      client = await database.connect();
-      await client.query("begin");
-
+  async updateMileage(scope, mileage, expectedCurrentMileage) {
+    const motorcycleId = scope.motorcycleId;
+    await executeOwnerSave(scope, async (client) => {
       const currentResult = await client.query<{ current_mileage: string }>(
         `select current_mileage
            from public.motorcycle_state
@@ -278,22 +253,22 @@ const postgresRepository: MotorcycleRepository = {
         );
       }
 
-      await client.query("commit");
-    } catch (error) {
-      if (client) {
-        await client.query("rollback").catch(() => undefined);
-      }
+      return {
+        result: updateResult.rows[0],
+        changed: updateResult.rows[0].changed,
+      };
+    }).catch((error) => {
       throw mapDatabaseError(error, "update");
-    } finally {
-      client?.release();
-    }
+    });
 
-    return this.getOverview(motorcycleId);
+    return this.getOverview(scope);
   },
 };
 
 export const motorcycleRepository = postgresRepository;
 
-export async function getMotorcycleOverview(): Promise<MotorcycleOverview> {
-  return motorcycleRepository.getOverview(MOTORCYCLE_ID);
+export async function getMotorcycleOverview(
+  scope: DataScope,
+): Promise<MotorcycleOverview> {
+  return motorcycleRepository.getOverview(scope);
 }

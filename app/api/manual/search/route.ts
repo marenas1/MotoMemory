@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { manualRepository } from "@/lib/data/manual-repository";
-import { MOTORCYCLE_ID } from "@/lib/data/motorcycle-repository";
 import { manualApiError } from "@/lib/manual/manual-api-error";
 import {
   manualSearchRequestSchema,
@@ -15,17 +14,24 @@ import { toManualIdentity } from "@/lib/manual/manual-presenter";
 import { searchManualChunks } from "@/lib/manual/retrieval";
 import { errorResponse } from "@/lib/server/api-response";
 import { AppError } from "@/lib/server/errors";
+import { getReadableScope } from "@/lib/server/read-access";
+import { enforcePublicRateLimit } from "@/lib/server/public-rate-limit";
+import { readBoundedJson } from "@/lib/server/request-boundary";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      throw new AppError("INVALID_MANUAL", "A JSON search body is required.", 400);
+    const access = await getReadableScope();
+    if (!access.isOwner) {
+      await enforcePublicRateLimit(request, "manual_search");
     }
+    const scope = access.scope;
+    const body = await readBoundedJson(request, {
+      invalidCode: "INVALID_MANUAL",
+      invalidMessage: "A JSON search body is required.",
+      tooLargeMessage: "The manual search body is too large.",
+    });
 
     const parsedBody = manualSearchRequestSchema.safeParse(body);
     if (!parsedBody.success) {
@@ -36,7 +42,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const manual = await manualRepository.findCurrent(MOTORCYCLE_ID);
+    const manual = await manualRepository.findCurrent(scope);
     if (!manual) {
       throw new AppError(
         "MANUAL_NOT_FOUND",
@@ -54,6 +60,7 @@ export async function POST(request: Request) {
     }
 
     const passages = (await searchManualChunks(
+      scope,
       manual.id,
       parsedBody.data.query,
       { repository: manualRepository },

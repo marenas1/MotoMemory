@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { manualRepository } from "@/lib/data/manual-repository";
+import { TEST_SCOPE } from "@/tests/fixtures/test-scope";
 
 describe("manual repository boundary", () => {
   it("rejects invalid metadata before requiring database credentials", async () => {
@@ -10,7 +11,7 @@ describe("manual repository boundary", () => {
     await expect(
       manualRepository.createDocument({
         id: "123e4567-e89b-12d3-a456-426614174000",
-        motorcycleId: "gs750",
+        scope: TEST_SCOPE,
         fileName: "manual.pdf",
         contentType: "application/pdf",
         storageKey: "manuals/gs750/manual.pdf",

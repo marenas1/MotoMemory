@@ -8,7 +8,6 @@ import {
   manualRepository,
   type ManualRepository,
 } from "@/lib/data/manual-repository";
-import { MOTORCYCLE_ID } from "@/lib/data/motorcycle-repository";
 import { createPageChunks } from "@/lib/manual/chunking";
 import { manualStorage, type ManualObjectStorage } from "@/lib/manual/manual-storage";
 import type {
@@ -23,6 +22,7 @@ import { TesseractCliOcrAdapter } from "@/lib/manual/ocr";
 import { buildPageProvenance } from "@/lib/manual/page-provenance";
 import { createLocalPdfReader } from "@/lib/manual/pdf-reader";
 import { AppError } from "@/lib/server/errors";
+import type { DataScope } from "@/lib/server/data-scope";
 
 export interface ManualIngestionDependencies {
   repository: Pick<ManualRepository, "findCurrent" | "beginProcessing">;
@@ -89,6 +89,7 @@ function isAvailablePage(page: ManualPageRecord): boolean {
 
 async function processStoredManual(
   document: ManualDocumentRecord,
+  scope: DataScope,
   dependencies: PageIngestionDependencies,
 ): Promise<void> {
   const storedObject = await dependencies.storage.get(document.storageKey);
@@ -102,7 +103,7 @@ async function processStoredManual(
     }
 
     const existingPages = new Map(
-      (await dependencies.repository.listPages(document.id)).map((page) => [
+      (await dependencies.repository.listPages(scope, document.id)).map((page) => [
         page.pageNumber,
         page,
       ]),
@@ -139,6 +140,7 @@ async function processStoredManual(
         const hasSearchableText = Boolean(provenance.extractedText.trim());
 
         await dependencies.repository.savePageWithChunks(
+          scope,
           document.id,
           {
             pageNumber,
@@ -157,6 +159,7 @@ async function processStoredManual(
       } catch (error) {
         failedPages.push(pageNumber);
         await dependencies.repository.savePageWithChunks(
+          scope,
           document.id,
           {
             pageNumber,
@@ -172,14 +175,14 @@ async function processStoredManual(
     }
 
     if (failedPages.length === 0 && dependencies.repository.upsertManualMaintenanceFacts) {
-      const pages = await dependencies.repository.listPages(document.id);
+      const pages = await dependencies.repository.listPages(scope, document.id);
       const facts = extractManualMaintenanceFacts(
         document.id,
         document.motorcycleId,
         pages,
       );
       await dependencies.repository.upsertManualMaintenanceFacts(
-        document.motorcycleId,
+        scope,
         document.id,
         facts,
       );
@@ -193,16 +196,17 @@ async function processStoredManual(
 
 export async function processManualPages(
   document: ManualDocumentRecord,
+  scope: DataScope,
   dependencies: PageIngestionDependencies,
 ): Promise<void> {
-  await processStoredManual(document, dependencies);
+  await processStoredManual(document, scope, dependencies);
 }
 
 export async function startManualIngestion(
-  motorcycleId: string,
+  scope: DataScope,
   dependencies: ManualIngestionDependencies,
 ): Promise<ManualIngestionStart> {
-  const currentDocument = await dependencies.repository.findCurrent(motorcycleId);
+  const currentDocument = await dependencies.repository.findCurrent(scope);
   if (!currentDocument) {
     throw new AppError(
       "MANUAL_NOT_FOUND",
@@ -216,6 +220,7 @@ export async function startManualIngestion(
   }
 
   const processingDocument = await dependencies.repository.beginProcessing(
+    scope,
     currentDocument.id,
   );
   if (!processingDocument) {
@@ -232,17 +237,20 @@ export async function startManualIngestion(
   };
 }
 
-export function startConfiguredManualIngestion(): Promise<ManualIngestionStart> {
-  return startManualIngestion(MOTORCYCLE_ID, {
+export function startConfiguredManualIngestion(
+  scope: DataScope,
+): Promise<ManualIngestionStart> {
+  return startManualIngestion(scope, {
     repository: manualRepository,
   });
 }
 
 export async function runManualIngestion(
+  scope: DataScope,
   documentId: string,
   dependencies: ManualProcessingDependencies,
 ): Promise<ManualDocumentRecord> {
-  const document = await dependencies.repository.findById(documentId);
+  const document = await dependencies.repository.findById(scope, documentId);
   if (!document) {
     throw new AppError(
       "MANUAL_NOT_FOUND",
@@ -265,7 +273,7 @@ export async function runManualIngestion(
 
   try {
     await dependencies.process(document);
-    const readyDocument = await dependencies.repository.markReady(documentId);
+    const readyDocument = await dependencies.repository.markReady(scope, documentId);
     if (!readyDocument) {
       throw new AppError(
         "MANUAL_PROCESSING",
@@ -277,6 +285,7 @@ export async function runManualIngestion(
     const failureMessage =
       error instanceof Error ? error.message : "Manual processing failed.";
     const failedDocument = await dependencies.repository.markFailed(
+      scope,
       documentId,
       failureMessage,
     );
@@ -300,12 +309,13 @@ const defaultPageIngestionDependencies: PageIngestionDependencies = {
 const configuredJobs = new Map<string, Promise<ManualDocumentRecord>>();
 
 export function runConfiguredManualIngestion(
+  scope: DataScope,
   documentId: string,
 ): Promise<ManualDocumentRecord> {
-  return runManualIngestion(documentId, {
+  return runManualIngestion(scope, documentId, {
     repository: manualRepository,
-    process: (document) =>
-      processManualPages(document, defaultPageIngestionDependencies),
+      process: (document) =>
+        processManualPages(document, scope, defaultPageIngestionDependencies),
   });
 }
 
@@ -315,6 +325,7 @@ export function runConfiguredManualIngestion(
  * process restart or a failed page attempt.
  */
 export function enqueueConfiguredManualIngestion(
+  scope: DataScope,
   documentId: string,
 ): Promise<ManualDocumentRecord> {
   const existingJob = configuredJobs.get(documentId);
@@ -322,7 +333,7 @@ export function enqueueConfiguredManualIngestion(
     return existingJob;
   }
 
-  const job = runConfiguredManualIngestion(documentId).finally(() => {
+  const job = runConfiguredManualIngestion(scope, documentId).finally(() => {
     configuredJobs.delete(documentId);
   });
   configuredJobs.set(documentId, job);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { persistManualDocument } from "@/lib/manual/manual-persistence";
+import { TEST_SCOPE } from "@/tests/fixtures/test-scope";
 
 describe("manual persistence cleanup boundary", () => {
   it("removes the stored object when metadata creation fails", async () => {
@@ -10,7 +11,7 @@ describe("manual persistence cleanup boundary", () => {
     await expect(
       persistManualDocument(
         {
-          motorcycleId: "gs750",
+          scope: TEST_SCOPE,
           fileName: "manual.pdf",
           contentType: "application/pdf",
           bytes: new Uint8Array([1, 2, 3]),
@@ -50,7 +51,7 @@ describe("manual persistence cleanup boundary", () => {
     await expect(
       persistManualDocument(
         {
-          motorcycleId: "gs750",
+          scope: TEST_SCOPE,
           fileName: "manual.pdf",
           contentType: "application/pdf",
           bytes: new Uint8Array([1, 2, 3]),
@@ -90,7 +91,7 @@ describe("manual persistence cleanup boundary", () => {
     await expect(
       persistManualDocument(
         {
-          motorcycleId: "gs750",
+          scope: TEST_SCOPE,
           fileName: "manual.pdf",
           contentType: "application/pdf",
           bytes: new Uint8Array([1, 2, 3]),

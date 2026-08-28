@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { maintenanceRepository } from "@/lib/data/maintenance-repository";
-import { MOTORCYCLE_ID } from "@/lib/data/motorcycle-repository";
 import {
   MaintenanceRecordValidationError,
   validateMaintenanceRecordUpdateInput,
@@ -9,14 +8,20 @@ import {
 import { maintenanceRecordResponseSchema } from "@/lib/maintenance/maintenance-api-schemas";
 import { errorResponse } from "@/lib/server/api-response";
 import { AppError } from "@/lib/server/errors";
+import type { DataScope } from "@/lib/server/data-scope";
+import { OWNER_SCOPE } from "@/lib/server/owner-scope";
+import { requireOwnerMode } from "@/lib/server/mutation-guard";
+import { readBoundedJson } from "@/lib/server/request-boundary";
+import { assertSameOrigin } from "@/lib/server/same-origin";
 
 export const runtime = "nodejs";
 
 async function normalizeDefinitionSelection(
+  scope: DataScope,
   definitionId: string,
 ): Promise<{ id: string; name: string }> {
   const definitions = await maintenanceRepository.listActiveMaintenanceDefinitions(
-    MOTORCYCLE_ID,
+    scope,
   );
   const definition = definitions.find((item) => item.id === definitionId);
   if (!definition) {
@@ -39,15 +44,11 @@ function assertRecordId(recordId: string): string {
 }
 
 async function readJson(request: Request): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    throw new AppError(
-      "INVALID_MAINTENANCE_RECORD",
-      "A JSON maintenance record body is required.",
-      400,
-    );
-  }
+  return readBoundedJson(request, {
+    invalidCode: "INVALID_MAINTENANCE_RECORD",
+    invalidMessage: "A JSON maintenance record body is required.",
+    tooLargeMessage: "The maintenance record request is too large.",
+  });
 }
 
 export async function PATCH(
@@ -55,6 +56,8 @@ export async function PATCH(
   { params }: { params: Promise<{ recordId: string }> },
 ) {
   try {
+    requireOwnerMode();
+    assertSameOrigin(request);
     const { recordId: rawRecordId } = await params;
     const recordId = assertRecordId(rawRecordId);
     const body = await readJson(request);
@@ -71,13 +74,13 @@ export async function PATCH(
     const definition =
       input.definitionId === undefined || input.definitionId === null
         ? null
-        : await normalizeDefinitionSelection(input.definitionId);
+        : await normalizeDefinitionSelection(OWNER_SCOPE, input.definitionId);
     const normalizedInput = definition
       ? { ...input, definitionId: definition.id, serviceType: definition.name }
       : input;
 
     const record = await maintenanceRepository.updateMaintenanceRecord(
-      MOTORCYCLE_ID,
+      OWNER_SCOPE,
       recordId,
       normalizedInput,
     );
@@ -92,9 +95,11 @@ export async function DELETE(
   { params }: { params: Promise<{ recordId: string }> },
 ) {
   try {
+    requireOwnerMode();
+    assertSameOrigin(_request);
     const { recordId: rawRecordId } = await params;
     const recordId = assertRecordId(rawRecordId);
-    await maintenanceRepository.deleteMaintenanceRecord(MOTORCYCLE_ID, recordId);
+    await maintenanceRepository.deleteMaintenanceRecord(OWNER_SCOPE, recordId);
     return NextResponse.json({ deletedId: recordId });
   } catch (error) {
     return errorResponse(error);

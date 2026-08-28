@@ -8,7 +8,6 @@ import {
   manualRepository,
   type ManualRepository,
 } from "@/lib/data/manual-repository";
-import { MOTORCYCLE_ID } from "@/lib/data/motorcycle-repository";
 import type { ManualDocumentRecord, PdfReader } from "@/lib/manual/manual-types";
 import { manualStorage, type ManualObjectStorage } from "@/lib/manual/manual-storage";
 import {
@@ -22,9 +21,10 @@ import { persistManualDocument } from "@/lib/manual/manual-persistence";
 import { createLocalPdfReader } from "@/lib/manual/pdf-reader";
 import { ManualValidationError } from "@/lib/manual/manual-validation";
 import { AppError } from "@/lib/server/errors";
+import type { DataScope } from "@/lib/server/data-scope";
 
 export interface UploadManualInput {
-  motorcycleId: string;
+  scope: DataScope;
   fileName: string;
   contentType: string;
   bytes: Uint8Array;
@@ -71,7 +71,7 @@ export async function uploadManualDocument(
 
   const sha256 = hashManualBytes(input.bytes);
   const identicalDocument = await dependencies.repository.findBySha256(
-    input.motorcycleId,
+    input.scope,
     sha256,
   );
   if (identicalDocument) {
@@ -83,7 +83,7 @@ export async function uploadManualDocument(
   }
 
   const currentDocument = await dependencies.repository.findCurrent(
-    input.motorcycleId,
+    input.scope,
   );
   if (currentDocument) {
     throw new AppError(
@@ -113,7 +113,7 @@ export async function uploadManualDocument(
 
   return persistManualDocument(
     {
-      motorcycleId: input.motorcycleId,
+      scope: input.scope,
       fileName: metadata.fileName,
       contentType: metadata.contentType,
       bytes: input.bytes,
@@ -130,10 +130,11 @@ export const defaultManualUploadDependencies: ManualUploadDependencies = {
 };
 
 export function uploadConfiguredManual(
-  input: Omit<UploadManualInput, "motorcycleId">,
+  scope: DataScope,
+  input: Omit<UploadManualInput, "scope">,
 ): Promise<ManualDocumentRecord> {
   return uploadManualDocument(
-    { ...input, motorcycleId: MOTORCYCLE_ID },
+    { ...input, scope },
     defaultManualUploadDependencies,
   );
 }

@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { createPageChunks } from "@/lib/manual/chunking";
 import { searchManualChunks } from "@/lib/manual/retrieval";
 import type { ManualChunkRecord, PageProvenance } from "@/lib/manual/manual-types";
+import { TEST_SCOPE } from "@/tests/fixtures/test-scope";
+import type { DataScope } from "@/lib/server/data-scope";
 
 const provenance: PageProvenance = {
   pdfPageNumber: 34,
@@ -49,7 +51,7 @@ describe("page-aware manual retrieval", () => {
   });
 
   it("returns source-linked passages and validates empty queries", async () => {
-    const searchChunks = async (manualId: string, query: string, limit: number) => {
+    const searchChunks = async (_scope: DataScope, manualId: string, query: string, limit: number) => {
       expect(manualId).toBe("manual-1");
       expect(query).toBe("oil interval");
       expect(limit).toBe(8);
@@ -57,13 +59,13 @@ describe("page-aware manual retrieval", () => {
     };
 
     await expect(
-      searchManualChunks("manual-1", " oil interval ", {
+      searchManualChunks(TEST_SCOPE, "manual-1", " oil interval ", {
         repository: { searchChunks },
       }),
     ).resolves.toEqual([result]);
 
     await expect(
-      searchManualChunks("manual-1", "   ", { repository: { searchChunks } }),
+      searchManualChunks(TEST_SCOPE, "manual-1", "   ", { repository: { searchChunks } }),
     ).rejects.toMatchObject({ code: "INVALID_MANUAL", status: 400 });
   });
 });

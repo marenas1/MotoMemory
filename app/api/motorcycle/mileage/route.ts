@@ -4,10 +4,20 @@ import { motorcycleRepository } from "@/lib/data/motorcycle-repository";
 import { validateMileageInput } from "@/lib/domain/mileage";
 import { errorResponse } from "@/lib/server/api-response";
 import { AppError } from "@/lib/server/errors";
+import { OWNER_SCOPE } from "@/lib/server/owner-scope";
+import { requireOwnerMode } from "@/lib/server/mutation-guard";
+import { readBoundedJson } from "@/lib/server/request-boundary";
+import { assertSameOrigin } from "@/lib/server/same-origin";
 
 export async function PATCH(request: Request) {
   try {
-    const body: unknown = await request.json();
+    requireOwnerMode();
+    assertSameOrigin(request);
+    const body: unknown = await readBoundedJson(request, {
+      invalidCode: "INVALID_MILEAGE",
+      invalidMessage: "A JSON mileage body is required.",
+      tooLargeMessage: "The mileage request is too large.",
+    });
     const bodyObject = typeof body === "object" && body !== null ? body : {};
     const mileage = validateMileageInput(
       "mileage" in bodyObject ? bodyObject.mileage : undefined,
@@ -19,7 +29,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json(
       await motorcycleRepository.updateMileage(
-        "gs750",
+        OWNER_SCOPE,
         mileage,
         expectedCurrentMileage,
       ),

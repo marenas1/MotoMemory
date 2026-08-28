@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { maintenanceRepository } from "@/lib/data/maintenance-repository";
-import { MOTORCYCLE_ID, getMotorcycleOverview } from "@/lib/data/motorcycle-repository";
+import { getMotorcycleOverview } from "@/lib/data/motorcycle-repository";
 import {
   MaintenanceRecordValidationError,
   validateMaintenanceRecordInput,
@@ -12,6 +12,12 @@ import {
 } from "@/lib/maintenance/maintenance-api-schemas";
 import { errorResponse } from "@/lib/server/api-response";
 import { AppError } from "@/lib/server/errors";
+import type { DataScope } from "@/lib/server/data-scope";
+import { OWNER_SCOPE } from "@/lib/server/owner-scope";
+import { requireOwnerMode } from "@/lib/server/mutation-guard";
+import { getReadableScope } from "@/lib/server/read-access";
+import { readBoundedJson } from "@/lib/server/request-boundary";
+import { assertSameOrigin } from "@/lib/server/same-origin";
 
 export const runtime = "nodejs";
 
@@ -20,18 +26,15 @@ function validationError(error: MaintenanceRecordValidationError): AppError {
 }
 
 async function readJson(request: Request): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    throw new AppError(
-      "INVALID_MAINTENANCE_RECORD",
-      "A JSON maintenance record body is required.",
-      400,
-    );
-  }
+  return readBoundedJson(request, {
+    invalidCode: "INVALID_MAINTENANCE_RECORD",
+    invalidMessage: "A JSON maintenance record body is required.",
+    tooLargeMessage: "The maintenance record request is too large.",
+  });
 }
 
 async function normalizeDefinitionSelection(
+  scope: DataScope,
   definitionId: string | null,
 ): Promise<{ id: string; name: string } | null> {
   if (!definitionId) {
@@ -39,7 +42,7 @@ async function normalizeDefinitionSelection(
   }
 
   const definitions = await maintenanceRepository.listActiveMaintenanceDefinitions(
-    MOTORCYCLE_ID,
+    scope,
   );
   const definition = definitions.find((item) => item.id === definitionId);
   if (!definition) {
@@ -55,10 +58,11 @@ async function normalizeDefinitionSelection(
 
 export async function GET() {
   try {
+    const { scope } = await getReadableScope();
     const [overview, records, definitions] = await Promise.all([
-      getMotorcycleOverview(),
-      maintenanceRepository.listMaintenanceRecords(MOTORCYCLE_ID),
-      maintenanceRepository.listActiveMaintenanceDefinitions(MOTORCYCLE_ID),
+      getMotorcycleOverview(scope),
+      maintenanceRepository.listMaintenanceRecords(scope),
+      maintenanceRepository.listActiveMaintenanceDefinitions(scope),
     ]);
 
     return NextResponse.json(
@@ -75,6 +79,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    requireOwnerMode();
+    assertSameOrigin(request);
     const body = await readJson(request);
     let input;
     try {
@@ -86,9 +92,9 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    const definition = await normalizeDefinitionSelection(input.definitionId ?? null);
+    const definition = await normalizeDefinitionSelection(OWNER_SCOPE, input.definitionId ?? null);
     const record = await maintenanceRepository.createMaintenanceRecord(
-      MOTORCYCLE_ID,
+      OWNER_SCOPE,
       definition
         ? { ...input, definitionId: definition.id, serviceType: definition.name }
         : input,

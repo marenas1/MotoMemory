@@ -297,7 +297,8 @@ p { line-height: 1.5; }
 .state-feedback-info { border-color: rgb(240 161 43 / 25%); background: rgb(240 161 43 / 8%); color: var(--color-amber-bright); }
 .state-feedback-success { border-color: rgb(169 196 108 / 30%); background: rgb(169 196 108 / 8%); color: var(--color-success); }
 .state-feedback-error { border-color: rgb(232 117 95 / 34%); background: rgb(232 117 95 / 8%); color: var(--color-danger); }
-
+.owner-permission-notice { display: grid; gap: 0.8rem; padding: 1rem; border: 1px solid rgb(240 161 43 / 30%); border-radius: 0.6rem; background: rgb(240 161 43 / 7%); }
+.owner-permission-notice p { margin: 0; color: var(--color-muted); font-size: 0.8rem; }
 .maintenance-history-panel { display: grid; gap: 1rem; margin-top: 1rem; padding: 1.65rem; }
 .maintenance-history-panel .panel-heading { margin-bottom: 0; }
 .maintenance-history-intro { max-width: 58rem; margin: 0; color: var(--color-muted); font-size: 0.82rem; }

@@ -96,7 +96,7 @@ export function ManualPdfViewer({
       <div className="panel-heading manual-viewer-heading">
         <div>
           <p className="eyebrow">Original document</p>
-          <h2 id="manual-viewer-heading">Private PDF viewer</h2>
+          <h2 id="manual-viewer-heading">Original PDF viewer</h2>
         </div>
         <a className="button button-outline" href={fileUrl} target="_blank" rel="noreferrer">
           Open in new tab
@@ -148,7 +148,7 @@ export function ManualPdfViewer({
             <p className="eyebrow">Native viewer unavailable</p>
             <h3>The browser could not render the embedded PDF.</h3>
             <p>
-              The original document is still available through the private server route. Open it in a new tab or try the embedded viewer again.
+              The original document is still available through the server route. Open it in a new tab or try the embedded viewer again.
             </p>
             <div className="manual-viewer-state-actions">
               <a className="button button-primary" href={fileUrl} target="_blank" rel="noreferrer">

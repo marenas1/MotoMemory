@@ -1,7 +1,9 @@
 import "server-only";
 
-import { Pool, type PoolClient, type QueryResultRow } from "pg";
+import { type PoolClient, type QueryResultRow } from "pg";
 
+import { getDatabasePool } from "@/lib/data/database";
+import { executeOwnerSave } from "@/lib/data/owner-save-coordinator";
 import type {
   ManualChunkInput,
   ManualChunkRecord,
@@ -25,10 +27,11 @@ import {
   validateManualStorageKey,
 } from "@/lib/manual/manual-validation";
 import { AppError } from "@/lib/server/errors";
+import type { DataScope } from "@/lib/server/data-scope";
 
 export interface CreateManualDocumentInput extends ManualMetadataInput {
   id: string;
-  motorcycleId: string;
+  scope: DataScope;
   storageKey: string;
 }
 
@@ -103,28 +106,6 @@ interface ManualProgressRow extends QueryResultRow {
 interface ManualPageFailureRow extends QueryResultRow {
   page_number: number;
   error_message: string | null;
-}
-
-let pool: Pool | undefined;
-
-function getPool(): Pool {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new AppError(
-      "INVALID_CONFIGURATION",
-      "DATABASE_URL is not configured for the local app.",
-      503,
-    );
-  }
-
-  pool ??= new Pool({
-    connectionString,
-    max: 5,
-    idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 5_000,
-  });
-
-  return pool;
 }
 
 function parseNumeric(value: string | number): number {
@@ -287,40 +268,43 @@ function mapManualProgress(
 }
 
 export interface ManualRepository {
-  findById(documentId: string): Promise<ManualDocumentRecord | null>;
-  findCurrent(motorcycleId: string): Promise<ManualDocumentRecord | null>;
+  findById(scope: DataScope, documentId: string): Promise<ManualDocumentRecord | null>;
+  findCurrent(scope: DataScope): Promise<ManualDocumentRecord | null>;
   findBySha256(
-    motorcycleId: string,
+    scope: DataScope,
     sha256: string,
   ): Promise<ManualDocumentRecord | null>;
   createDocument(input: CreateManualDocumentInput): Promise<ManualDocumentRecord>;
-  deleteDocument(documentId: string): Promise<void>;
-  beginProcessing(documentId: string): Promise<ManualDocumentRecord | null>;
-  markReady(documentId: string): Promise<ManualDocumentRecord | null>;
+  deleteDocument(scope: DataScope, documentId: string): Promise<void>;
+  beginProcessing(scope: DataScope, documentId: string): Promise<ManualDocumentRecord | null>;
+  markReady(scope: DataScope, documentId: string): Promise<ManualDocumentRecord | null>;
   markFailed(
+    scope: DataScope,
     documentId: string,
     errorMessage: string,
   ): Promise<ManualDocumentRecord | null>;
-  listPages(manualId: string): Promise<ManualPageRecord[]>;
+  listPages(scope: DataScope, manualId: string): Promise<ManualPageRecord[]>;
   savePageWithChunks(
+    scope: DataScope,
     manualId: string,
     page: ManualPageUpsertInput,
     chunks: ManualChunkInput[],
   ): Promise<ManualPageRecord>;
-  getIngestionProgress(manualId: string): Promise<ManualIngestionProgress>;
+  getIngestionProgress(scope: DataScope, manualId: string): Promise<ManualIngestionProgress>;
   searchChunks(
+    scope: DataScope,
     manualId: string,
     query: string,
     limit: number,
   ): Promise<ManualChunkRecord[]>;
-  listMaintenanceFacts(manualId: string): Promise<ManualMaintenanceFactRecord[]>;
+  listMaintenanceFacts(scope: DataScope, manualId: string): Promise<ManualMaintenanceFactRecord[]>;
   upsertManualMaintenanceFacts(
-    motorcycleId: string,
+    scope: DataScope,
     manualId: string,
     facts: ManualMaintenanceFactInput[],
   ): Promise<ManualMaintenanceFactRecord[]>;
   correctMaintenanceFact(
-    motorcycleId: string,
+    scope: DataScope,
     manualId: string,
     factId: string,
     input: MaintenanceFactCorrectionInput,
@@ -403,16 +387,16 @@ function mapManualDatabaseError(
 }
 
 const postgresManualRepository: ManualRepository = {
-  async findById(documentId) {
+  async findById(scope, documentId) {
     try {
-      const result = await getPool().query<ManualDocumentRow>(
+      const result = await getDatabasePool().query<ManualDocumentRow>(
         `select id, motorcycle_id, file_name, content_type, storage_key,
                 file_size_bytes, sha256, page_count, status, extraction_method,
                 error_message, uploaded_at, processed_at
            from public.manual_documents
-          where id = $1
+          where id = $1 and motorcycle_id = $2
           limit 1`,
-        [documentId],
+        [documentId, scope.motorcycleId],
       );
 
       return result.rows[0] ? mapManualDocument(result.rows[0]) : null;
@@ -421,9 +405,9 @@ const postgresManualRepository: ManualRepository = {
     }
   },
 
-  async findCurrent(motorcycleId) {
+  async findCurrent(scope) {
     try {
-      const result = await getPool().query<ManualDocumentRow>(
+      const result = await getDatabasePool().query<ManualDocumentRow>(
         `select id, motorcycle_id, file_name, content_type, storage_key,
                 file_size_bytes, sha256, page_count, status, extraction_method,
                 error_message, uploaded_at, processed_at
@@ -431,7 +415,7 @@ const postgresManualRepository: ManualRepository = {
           where motorcycle_id = $1
           order by uploaded_at desc
           limit 1`,
-        [motorcycleId],
+        [scope.motorcycleId],
       );
 
       return result.rows[0] ? mapManualDocument(result.rows[0]) : null;
@@ -440,17 +424,17 @@ const postgresManualRepository: ManualRepository = {
     }
   },
 
-  async findBySha256(motorcycleId, sha256) {
+  async findBySha256(scope, sha256) {
     try {
       const validatedSha256 = validateManualSha256(sha256);
-      const result = await getPool().query<ManualDocumentRow>(
+      const result = await getDatabasePool().query<ManualDocumentRow>(
         `select id, motorcycle_id, file_name, content_type, storage_key,
                 file_size_bytes, sha256, page_count, status, extraction_method,
                 error_message, uploaded_at, processed_at
            from public.manual_documents
           where motorcycle_id = $1 and sha256 = $2
           limit 1`,
-        [motorcycleId, validatedSha256],
+        [scope.motorcycleId, validatedSha256],
       );
 
       return result.rows[0] ? mapManualDocument(result.rows[0]) : null;
@@ -463,7 +447,7 @@ const postgresManualRepository: ManualRepository = {
     try {
       const metadata = validateManualMetadata(input);
       const storageKey = validateManualStorageKey(input.storageKey);
-      const result = await getPool().query<ManualDocumentRow>(
+      const result = await getDatabasePool().query<ManualDocumentRow>(
         `insert into public.manual_documents (
            id, motorcycle_id, file_name, content_type, storage_key,
            file_size_bytes, sha256, page_count, status, extraction_method
@@ -474,7 +458,7 @@ const postgresManualRepository: ManualRepository = {
                    extraction_method, error_message, uploaded_at, processed_at`,
         [
           input.id,
-          input.motorcycleId,
+          input.scope.motorcycleId,
           metadata.fileName,
           metadata.contentType,
           storageKey,
@@ -498,93 +482,102 @@ const postgresManualRepository: ManualRepository = {
     }
   },
 
-  async deleteDocument(documentId) {
+  async deleteDocument(scope, documentId) {
     try {
-      await getPool().query(
-        "delete from public.manual_documents where id = $1",
-        [documentId],
+      await getDatabasePool().query(
+        "delete from public.manual_documents where id = $1 and motorcycle_id = $2",
+        [documentId, scope.motorcycleId],
       );
     } catch (error) {
       throw mapManualDatabaseError(error, "write");
     }
   },
 
-  async beginProcessing(documentId) {
+  async beginProcessing(scope, documentId) {
     try {
-      const result = await getPool().query<ManualDocumentRow>(
+      const result = await getDatabasePool().query<ManualDocumentRow>(
         `update public.manual_documents
             set status = 'processing', error_message = null, processed_at = null
-          where id = $1 and status in ('uploaded', 'failed', 'ready')
+          where id = $1 and motorcycle_id = $2 and status in ('uploaded', 'failed', 'ready')
           returning id, motorcycle_id, file_name, content_type, storage_key,
                     file_size_bytes, sha256, page_count, status,
                     extraction_method, error_message, uploaded_at, processed_at`,
-        [documentId],
+        [documentId, scope.motorcycleId],
       );
 
       if (result.rows[0]) {
         return mapManualDocument(result.rows[0]);
       }
 
-      return this.findById(documentId);
+      return this.findById(scope, documentId);
     } catch (error) {
       throw mapManualDatabaseError(error, "write");
     }
   },
 
-  async markReady(documentId) {
+  async markReady(scope, documentId) {
     try {
-      const result = await getPool().query<ManualDocumentRow>(
+      return await executeOwnerSave(scope, async (client) => {
+        const result = await client.query<ManualDocumentRow>(
+          `update public.manual_documents
+              set status = 'ready', error_message = null, processed_at = now()
+            where id = $1 and motorcycle_id = $2 and status = 'processing'
+            returning id, motorcycle_id, file_name, content_type, storage_key,
+                      file_size_bytes, sha256, page_count, status,
+                      extraction_method, error_message, uploaded_at, processed_at`,
+          [documentId, scope.motorcycleId],
+        );
+
+        const row = result.rows[0];
+        if (!row) {
+          throw new AppError(
+            "MANUAL_PROCESSING",
+            "The manual was not processing when readiness was recorded.",
+            409,
+          );
+        }
+
+        return { result: mapManualDocument(row), changed: true };
+      });
+    } catch (error) {
+      throw mapManualDatabaseError(error, "write");
+    }
+  },
+
+  async markFailed(scope, documentId, errorMessage) {
+    try {
+      const result = await getDatabasePool().query<ManualDocumentRow>(
         `update public.manual_documents
-            set status = 'ready', error_message = null, processed_at = now()
-          where id = $1 and status = 'processing'
+            set status = 'failed', error_message = $3, processed_at = null
+          where id = $1 and motorcycle_id = $2 and status = 'processing'
           returning id, motorcycle_id, file_name, content_type, storage_key,
                     file_size_bytes, sha256, page_count, status,
                     extraction_method, error_message, uploaded_at, processed_at`,
-        [documentId],
+        [documentId, scope.motorcycleId, errorMessage.slice(0, 2000)],
       );
 
       if (result.rows[0]) {
         return mapManualDocument(result.rows[0]);
       }
 
-      return this.findById(documentId);
+      return this.findById(scope, documentId);
     } catch (error) {
       throw mapManualDatabaseError(error, "write");
     }
   },
 
-  async markFailed(documentId, errorMessage) {
+  async listPages(scope, manualId) {
     try {
-      const result = await getPool().query<ManualDocumentRow>(
-        `update public.manual_documents
-            set status = 'failed', error_message = $2, processed_at = null
-          where id = $1 and status = 'processing'
-          returning id, motorcycle_id, file_name, content_type, storage_key,
-                    file_size_bytes, sha256, page_count, status,
-                    extraction_method, error_message, uploaded_at, processed_at`,
-        [documentId, errorMessage.slice(0, 2000)],
-      );
-
-      if (result.rows[0]) {
-        return mapManualDocument(result.rows[0]);
-      }
-
-      return this.findById(documentId);
-    } catch (error) {
-      throw mapManualDatabaseError(error, "write");
-    }
-  },
-
-  async listPages(manualId) {
-    try {
-      const result = await getPool().query<ManualPageRow>(
+      const result = await getDatabasePool().query<ManualPageRow>(
         `select id, manual_id, page_number, printed_page_label,
                 extracted_text, extraction_status, error_message,
                 ocr_engine, processed_at
-           from public.manual_pages
-          where manual_id = $1
-          order by page_number asc`,
-        [manualId],
+           from public.manual_pages p
+          where p.manual_id = $1
+            and exists (select 1 from public.manual_documents d
+                         where d.id = p.manual_id and d.motorcycle_id = $2)
+          order by p.page_number asc`,
+        [manualId, scope.motorcycleId],
       );
 
       return result.rows.map(mapManualPage);
@@ -593,13 +586,23 @@ const postgresManualRepository: ManualRepository = {
     }
   },
 
-  async savePageWithChunks(manualId, page, chunks) {
+  async savePageWithChunks(scope, manualId, page, chunks) {
     let client: PoolClient | undefined;
 
     try {
-      const database = getPool();
+      const database = getDatabasePool();
       client = await database.connect();
       await client.query("begin");
+
+      const manualResult = await client.query<{ id: string }>(
+        `select id from public.manual_documents
+          where id = $1 and motorcycle_id = $2
+          for update`,
+        [manualId, scope.motorcycleId],
+      );
+      if (!manualResult.rows[0]) {
+        throw new AppError("MANUAL_NOT_FOUND", "The manual was not found.", 404);
+      }
 
       const pageResult = await client.query<ManualPageRow>(
         `insert into public.manual_pages (
@@ -680,9 +683,9 @@ const postgresManualRepository: ManualRepository = {
     }
   },
 
-  async getIngestionProgress(manualId) {
+  async getIngestionProgress(scope, manualId) {
     try {
-      const database = getPool();
+      const database = getDatabasePool();
       const [progressResult, failuresResult] = await Promise.all([
         database.query<ManualProgressRow>(
         `select d.page_count as total_pages,
@@ -696,17 +699,19 @@ const postgresManualRepository: ManualRepository = {
                   as failed_pages
            from public.manual_documents d
            left join public.manual_pages p on p.manual_id = d.id
-          where d.id = $1
+          where d.id = $1 and d.motorcycle_id = $2
           group by d.page_count`,
-        [manualId],
+        [manualId, scope.motorcycleId],
         ),
         database.query<ManualPageFailureRow>(
           `select page_number, error_message
-             from public.manual_pages
-            where manual_id = $1
-              and extraction_status = 'failed'
-            order by page_number asc`,
-          [manualId],
+             from public.manual_pages p
+            where p.manual_id = $1
+              and exists (select 1 from public.manual_documents d
+                           where d.id = p.manual_id and d.motorcycle_id = $2)
+              and p.extraction_status = 'failed'
+            order by p.page_number asc`,
+          [manualId, scope.motorcycleId],
         ),
       ]);
 
@@ -731,18 +736,20 @@ const postgresManualRepository: ManualRepository = {
     }
   },
 
-  async searchChunks(manualId, query, limit) {
+  async searchChunks(scope, manualId, query, limit) {
     try {
-      const result = await getPool().query<ManualChunkRow>(
+      const result = await getDatabasePool().query<ManualChunkRow>(
         `select id, manual_id, page_start, page_end, printed_page_start,
                 printed_page_end, section_label, content, processor_version,
                 ts_rank_cd(search_vector, plainto_tsquery('simple', $2)) as rank
-           from public.manual_chunks
-          where manual_id = $1
-            and search_vector @@ plainto_tsquery('simple', $2)
-          order by rank desc, page_start asc, id asc
+           from public.manual_chunks c
+          where c.manual_id = $1
+            and exists (select 1 from public.manual_documents d
+                         where d.id = c.manual_id and d.motorcycle_id = $4)
+            and c.search_vector @@ plainto_tsquery('simple', $2)
+          order by rank desc, c.page_start asc, c.id asc
           limit $3`,
-        [manualId, query, limit],
+        [manualId, query, limit, scope.motorcycleId],
       );
 
       return result.rows.map(mapManualChunk);
@@ -751,15 +758,16 @@ const postgresManualRepository: ManualRepository = {
     }
   },
 
-  async listMaintenanceFacts(manualId) {
+  async listMaintenanceFacts(scope, manualId) {
     try {
-      const result = await getPool().query<MaintenanceRow>(
+      const result = await getDatabasePool().query<MaintenanceRow>(
         `select ${maintenanceFactColumns()}
            from public.maintenance_definitions
           where source_manual_id = $1
+            and motorcycle_id = $2
             and status = 'active'
           order by source_page_start asc, name asc`,
-        [manualId],
+        [manualId, scope.motorcycleId],
       );
 
       return result.rows.map(mapMaintenanceFact);
@@ -768,12 +776,23 @@ const postgresManualRepository: ManualRepository = {
     }
   },
 
-  async upsertManualMaintenanceFacts(motorcycleId, manualId, facts) {
+  async upsertManualMaintenanceFacts(scope, manualId, facts) {
+    const motorcycleId = scope.motorcycleId;
     let client: PoolClient | undefined;
 
     try {
-      client = await getPool().connect();
+      client = await getDatabasePool().connect();
       await client.query("begin");
+
+      const manualResult = await client.query<{ id: string }>(
+        `select id from public.manual_documents
+          where id = $1 and motorcycle_id = $2
+          for update`,
+        [manualId, motorcycleId],
+      );
+      if (!manualResult.rows[0]) {
+        throw new AppError("MANUAL_NOT_FOUND", "The manual was not found.", 404);
+      }
 
       await client.query(
         `delete from public.maintenance_definitions
@@ -860,82 +879,76 @@ const postgresManualRepository: ManualRepository = {
       client?.release();
     }
 
-    return this.listMaintenanceFacts(manualId);
+    return this.listMaintenanceFacts(scope, manualId);
   },
 
-  async correctMaintenanceFact(motorcycleId, manualId, factId, input) {
-    let client: PoolClient | undefined;
-
+  async correctMaintenanceFact(scope, manualId, factId, input) {
+    const motorcycleId = scope.motorcycleId;
     try {
-      client = await getPool().connect();
-      await client.query("begin");
-
-      const currentResult = await client.query<MaintenanceRow>(
-        `select ${maintenanceFactColumns()}
-           from public.maintenance_definitions
-          where id = $1
-            and motorcycle_id = $2
-            and source_manual_id = $3
-            and status = 'active'
-          for update`,
-        [factId, motorcycleId, manualId],
-      );
-      const current = currentResult.rows[0];
-      if (!current) {
-        throw new AppError(
-          "MANUAL_NOT_FOUND",
-          "The manual maintenance fact was not found.",
-          404,
+      return await executeOwnerSave(scope, async (client) => {
+        const currentResult = await client.query<MaintenanceRow>(
+          `select ${maintenanceFactColumns()}
+             from public.maintenance_definitions
+            where id = $1
+              and motorcycle_id = $2
+              and source_manual_id = $3
+              and status = 'active'
+            for update`,
+          [factId, motorcycleId, manualId],
         );
-      }
+        const current = currentResult.rows[0];
+        if (!current) {
+          throw new AppError(
+            "MANUAL_NOT_FOUND",
+            "The manual maintenance fact was not found.",
+            404,
+          );
+        }
 
-      const normalized = normalizeMaintenanceFactCorrection({
-        name: input.name ?? current.name,
-        intervalValue: input.intervalValue ?? parsePositiveNumber(current.interval_value),
-        intervalUnit: input.intervalUnit ?? current.interval_unit,
-        notes: input.notes === undefined ? current.notes : input.notes,
+        const normalized = normalizeMaintenanceFactCorrection({
+          name: input.name ?? current.name,
+          intervalValue: input.intervalValue ?? parsePositiveNumber(current.interval_value),
+          intervalUnit: input.intervalUnit ?? current.interval_unit,
+          notes: input.notes === undefined ? current.notes : input.notes,
+        });
+
+        const updatedResult = await client.query<MaintenanceRow>(
+          `update public.maintenance_definitions
+              set name = $4,
+                  interval_value = $5,
+                  interval_unit = $6,
+                  interval_miles = $7,
+                  due_window_miles = $7,
+                  notes = $8,
+                  origin = 'rider_corrected',
+                  corrected_at = now()
+            where id = $1
+              and motorcycle_id = $2
+              and source_manual_id = $3
+            returning ${maintenanceFactColumns()}`,
+          [
+            factId,
+            motorcycleId,
+            manualId,
+            normalized.name,
+            normalized.intervalValue,
+            normalized.intervalUnit,
+            normalized.intervalMiles,
+            normalized.notes,
+          ],
+        );
+        const updated = updatedResult.rows[0];
+        if (!updated) {
+          throw new AppError(
+            "UPDATE_FAILED",
+            "The maintenance fact was not returned after correction.",
+          );
+        }
+
+        return { result: mapMaintenanceFact(updated), changed: true };
       });
-
-      const updatedResult = await client.query<MaintenanceRow>(
-        `update public.maintenance_definitions
-            set name = $4,
-                interval_value = $5,
-                interval_unit = $6,
-                interval_miles = $7,
-                due_window_miles = $7,
-                notes = $8,
-                origin = 'rider_corrected',
-                corrected_at = now()
-          where id = $1
-            and motorcycle_id = $2
-            and source_manual_id = $3
-          returning ${maintenanceFactColumns()}`,
-        [
-          factId,
-          motorcycleId,
-          manualId,
-          normalized.name,
-          normalized.intervalValue,
-          normalized.intervalUnit,
-          normalized.intervalMiles,
-          normalized.notes,
-        ],
-      );
-      const updated = updatedResult.rows[0];
-      if (!updated) {
-        throw new AppError(
-          "UPDATE_FAILED",
-          "The maintenance fact was not returned after correction.",
-        );
-      }
-
-      await client.query("commit");
-      return mapMaintenanceFact(updated);
     } catch (error) {
-      await client?.query("rollback").catch(() => undefined);
       throw mapManualDatabaseError(error, "write");
-    } finally {
-      client?.release();
     }
   },
 };

@@ -12,6 +12,7 @@ import type { PublicManualDocumentRecord } from "@/lib/manual/manual-types";
 
 interface ApiErrorPayload {
   error?: {
+    code?: string;
     message?: string;
   };
 }

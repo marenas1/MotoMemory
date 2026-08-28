@@ -15,6 +15,7 @@ import type {
   PdfPageImage,
   PdfReader,
 } from "@/lib/manual/manual-types";
+import { TEST_SCOPE } from "@/tests/fixtures/test-scope";
 
 const manual: ManualDocumentRecord = {
   id: "123e4567-e89b-12d3-a456-426614174000",
@@ -52,7 +53,7 @@ function createPageDependencies(options: {
   failingPages?: number[];
   ocrTextByPage?: Record<number, string>;
 }): {
-  dependencies: Parameters<typeof processManualPages>[1];
+  dependencies: Parameters<typeof processManualPages>[2];
   pages: ManualPageRecord[];
   saved: Array<{ page: ManualPageUpsertInput; chunks: ManualChunkInput[] }>;
   upsertedFacts: ManualMaintenanceFactInput[][];
@@ -91,8 +92,8 @@ function createPageDependencies(options: {
   return {
     dependencies: {
       repository: {
-        listPages: async () => [...pages],
-        savePageWithChunks: async (_manualId, page, chunks) => {
+        listPages: async (_scope, _manualId) => [...pages],
+        savePageWithChunks: async (_scope, _manualId, page, chunks) => {
           saved.push({ page, chunks });
           const index = pages.findIndex((existing) => existing.pageNumber === page.pageNumber);
           const record: ManualPageRecord = {
@@ -113,7 +114,7 @@ function createPageDependencies(options: {
           }
           return record;
         },
-        upsertManualMaintenanceFacts: async (_motorcycleId, _manualId, facts) => {
+        upsertManualMaintenanceFacts: async (_scope, _manualId, facts) => {
           upsertedFacts.push(facts);
           return [];
         },
@@ -142,10 +143,10 @@ describe("manual ingestion lifecycle boundary", () => {
     async (status) => {
       const beginProcessing = async () => ({ ...manual, status: "processing" as const });
 
-      const result = await startManualIngestion("gs750", {
+      const result = await startManualIngestion(TEST_SCOPE, {
         repository: {
-          findCurrent: async () => ({ ...manual, status }),
-          beginProcessing,
+          findCurrent: async (_scope) => ({ ...manual, status }),
+          beginProcessing: async (_scope, _manualId) => beginProcessing(),
         },
       });
 
@@ -156,10 +157,10 @@ describe("manual ingestion lifecycle boundary", () => {
   it("does not restart an already processing manual", async () => {
     let beginCalls = 0;
 
-    const result = await startManualIngestion("gs750", {
+    const result = await startManualIngestion(TEST_SCOPE, {
       repository: {
-        findCurrent: async () => ({ ...manual, status: "processing" }),
-        beginProcessing: async () => {
+        findCurrent: async (_scope) => ({ ...manual, status: "processing" }),
+        beginProcessing: async (_scope, _manualId) => {
           beginCalls += 1;
           return { ...manual, status: "processing" };
         },
@@ -173,10 +174,10 @@ describe("manual ingestion lifecycle boundary", () => {
   it("allows a ready manual to be reprocessed", async () => {
     let beginCalls = 0;
 
-    const result = await startManualIngestion("gs750", {
+    const result = await startManualIngestion(TEST_SCOPE, {
       repository: {
-        findCurrent: async () => ({ ...manual, status: "ready", processedAt: new Date().toISOString() }),
-        beginProcessing: async () => {
+        findCurrent: async (_scope) => ({ ...manual, status: "ready", processedAt: new Date().toISOString() }),
+        beginProcessing: async (_scope, _manualId) => {
           beginCalls += 1;
           return { ...manual, status: "processing" };
         },
@@ -189,10 +190,10 @@ describe("manual ingestion lifecycle boundary", () => {
 
   it("reports a missing manual instead of creating processing state", async () => {
     await expect(
-      startManualIngestion("gs750", {
+      startManualIngestion(TEST_SCOPE, {
         repository: {
-          findCurrent: async () => null,
-          beginProcessing: async () => null,
+          findCurrent: async (_scope) => null,
+          beginProcessing: async (_scope, _manualId) => null,
         },
       }),
       ).rejects.toMatchObject({ code: "MANUAL_NOT_FOUND", status: 404 });
@@ -202,14 +203,14 @@ describe("manual ingestion lifecycle boundary", () => {
     const transitions: string[] = [];
     const failedManual = { ...manual, status: "failed" as const, errorMessage: "OCR unavailable" };
 
-    const result = await runManualIngestion("manual-1", {
+    const result = await runManualIngestion(TEST_SCOPE, "manual-1", {
       repository: {
-        findById: async () => ({ ...manual, id: "manual-1", status: "processing" }),
-        markReady: async () => {
+        findById: async (_scope, _documentId) => ({ ...manual, id: "manual-1", status: "processing" }),
+        markReady: async (_scope, _documentId) => {
           transitions.push("ready");
           return { ...manual, status: "ready" };
         },
-        markFailed: async (_documentId, message) => {
+        markFailed: async (_scope, _documentId, message) => {
           transitions.push(`failed:${message}`);
           return failedManual;
         },
@@ -226,14 +227,14 @@ describe("manual ingestion lifecycle boundary", () => {
   it("marks a processor success ready only after the processor resolves", async () => {
     const transitions: string[] = [];
 
-    const result = await runManualIngestion("manual-1", {
+    const result = await runManualIngestion(TEST_SCOPE, "manual-1", {
       repository: {
-        findById: async () => ({ ...manual, id: "manual-1", status: "processing" }),
-        markReady: async () => {
+        findById: async (_scope, _documentId) => ({ ...manual, id: "manual-1", status: "processing" }),
+        markReady: async (_scope, _documentId) => {
           transitions.push("ready");
           return { ...manual, status: "ready", processedAt: new Date().toISOString() };
         },
-        markFailed: async () => {
+        markFailed: async (_scope, _documentId, _message) => {
           transitions.push("failed");
           return { ...manual, status: "failed" };
         },
@@ -246,13 +247,35 @@ describe("manual ingestion lifecycle boundary", () => {
     expect(result.status).toBe("ready");
     expect(transitions).toEqual(["processed", "ready"]);
   });
+
+  it("records a readiness failure as a failed processing attempt", async () => {
+    const transitions: string[] = [];
+
+    const result = await runManualIngestion(TEST_SCOPE, "manual-1", {
+      repository: {
+        findById: async () => ({ ...manual, id: "manual-1", status: "processing" }),
+        markReady: async () => {
+          transitions.push("ready");
+          throw new Error("readiness write failed");
+        },
+        markFailed: async (_scope, _documentId, message) => {
+          transitions.push(`failed:${message}`);
+          return { ...manual, status: "failed", errorMessage: message };
+        },
+      },
+      process: async () => undefined,
+    });
+
+    expect(result.status).toBe("failed");
+    expect(transitions).toEqual(["ready", "failed:readiness write failed"]);
+  });
 });
 
 describe("page-by-page OCR ingestion", () => {
   it("accounts for every page and persists page-linked searchable chunks", async () => {
     const fixture = createPageDependencies({ pageCount: 3 });
 
-    await processManualPages({ ...manual, pageCount: 3, status: "processing" }, fixture.dependencies);
+    await processManualPages({ ...manual, pageCount: 3, status: "processing" }, TEST_SCOPE, fixture.dependencies);
 
     expect(fixture.renderedPages).toEqual([1, 2, 3]);
     expect(fixture.pages).toHaveLength(3);
@@ -268,7 +291,7 @@ describe("page-by-page OCR ingestion", () => {
       ocrTextByPage: { 1: "Maintenance schedule\nOil change every 2,000 miles" },
     });
 
-    await processManualPages({ ...manual, pageCount: 1, status: "processing" }, fixture.dependencies);
+    await processManualPages({ ...manual, pageCount: 1, status: "processing" }, TEST_SCOPE, fixture.dependencies);
 
     expect(fixture.upsertedFacts).toHaveLength(1);
     expect(fixture.upsertedFacts[0]).toEqual([
@@ -291,7 +314,7 @@ describe("page-by-page OCR ingestion", () => {
       },
     });
 
-    await processManualPages({ ...manual, pageCount: 2, status: "processing" }, fixture.dependencies);
+    await processManualPages({ ...manual, pageCount: 2, status: "processing" }, TEST_SCOPE, fixture.dependencies);
 
     expect(fixture.pages).toHaveLength(2);
     expect(fixture.pages[0]).toMatchObject({
@@ -308,7 +331,7 @@ describe("page-by-page OCR ingestion", () => {
     const fixture = createPageDependencies({ pageCount: 3, failingPages: [2] });
 
     await expect(
-      processManualPages({ ...manual, pageCount: 3, status: "processing" }, fixture.dependencies),
+      processManualPages({ ...manual, pageCount: 3, status: "processing" }, TEST_SCOPE, fixture.dependencies),
     ).rejects.toMatchObject({
       failedPages: [2],
     });
@@ -328,12 +351,12 @@ describe("page-by-page OCR ingestion", () => {
       existingPages: [createPage(1), createPage(2, "failed")],
     });
 
-    await processManualPages({ ...manual, pageCount: 3, status: "processing" }, fixture.dependencies);
+    await processManualPages({ ...manual, pageCount: 3, status: "processing" }, TEST_SCOPE, fixture.dependencies);
     expect(fixture.renderedPages).toEqual([2, 3]);
     const firstWriteCount = fixture.saved.length;
 
     fixture.renderedPages.length = 0;
-    await processManualPages({ ...manual, pageCount: 3, status: "processing" }, fixture.dependencies);
+    await processManualPages({ ...manual, pageCount: 3, status: "processing" }, TEST_SCOPE, fixture.dependencies);
 
     expect(fixture.renderedPages).toEqual([]);
     expect(fixture.saved).toHaveLength(firstWriteCount);

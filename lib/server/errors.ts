@@ -1,12 +1,17 @@
 import "server-only";
 
 export type AppErrorCode =
+  | "READ_ONLY_MODE"
   | "MOTORCYCLE_NOT_FOUND"
   | "INVALID_MILEAGE"
   | "INVALID_MAINTENANCE_RECORD"
   | "MAINTENANCE_RECORD_NOT_FOUND"
   | "MAINTENANCE_DEFINITION_NOT_FOUND"
   | "INVALID_CONFIGURATION"
+  | "INVALID_REQUEST"
+  | "REQUEST_TOO_LARGE"
+  | "CSRF_FORBIDDEN"
+  | "RATE_LIMITED"
   | "DATABASE_UNAVAILABLE"
   | "UPDATE_FAILED"
   | "STALE_STATE"
@@ -21,12 +26,19 @@ export type AppErrorCode =
 export class AppError extends Error {
   readonly code: AppErrorCode;
   readonly status: number;
+  readonly retryAfterSeconds: number | null;
 
-  constructor(code: AppErrorCode, message: string, status = 500) {
+  constructor(
+    code: AppErrorCode,
+    message: string,
+    status = 500,
+    options: { retryAfterSeconds?: number | null } = {},
+  ) {
     super(message);
     this.name = "AppError";
     this.code = code;
     this.status = status;
+    this.retryAfterSeconds = options.retryAfterSeconds ?? null;
   }
 }
 

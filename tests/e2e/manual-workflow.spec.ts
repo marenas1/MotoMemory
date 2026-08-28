@@ -89,6 +89,10 @@ async function fulfillJson(
 test("covers the private upload, citation, correction, duplicate, and mileage contracts", async ({
   page,
 }) => {
+  test.skip(
+    process.env.MOTOMEMORY_OWNER_E2E !== "1",
+    "Requires a configured private local-owner acceptance run.",
+  );
   let currentManual: typeof uploadedManual | typeof readyManual | null = null;
   let currentFact: TestFact = fact;
 
@@ -288,6 +292,10 @@ test("covers the private upload, citation, correction, duplicate, and mileage co
 });
 
 test("shows OCR page failure records while keeping the original PDF viewable", async ({ page }) => {
+  test.skip(
+    process.env.MOTOMEMORY_OWNER_E2E !== "1",
+    "Requires a configured private local-owner acceptance run.",
+  );
   const failedManual = {
     ...readyManual,
     status: "failed" as const,

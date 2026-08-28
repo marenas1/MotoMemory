@@ -9,15 +9,21 @@ const repository = vi.hoisted(() => ({
 }));
 
 const getMotorcycleOverview = vi.hoisted(() => vi.fn());
+const { requireOwnerMode } = vi.hoisted(() => ({ requireOwnerMode: vi.fn() }));
+const { getReadableScope } = vi.hoisted(() => ({ getReadableScope: vi.fn() }));
 
 vi.mock("@/lib/data/maintenance-repository", () => ({
   maintenanceRepository: repository,
 }));
 
 vi.mock("@/lib/data/motorcycle-repository", () => ({
-  MOTORCYCLE_ID: "gs750",
   getMotorcycleOverview,
 }));
+vi.mock("@/lib/server/mutation-guard", () => ({ requireOwnerMode }));
+vi.mock("@/lib/server/read-access", () => ({ getReadableScope }));
+
+import { TEST_SCOPE } from "@/tests/fixtures/test-scope";
+import { OWNER_SCOPE } from "@/lib/server/owner-scope";
 
 import { DELETE, PATCH } from "@/app/api/maintenance/records/[recordId]/route";
 import { GET, POST } from "@/app/api/maintenance/records/route";
@@ -59,6 +65,8 @@ const record = {
 describe("maintenance history routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    requireOwnerMode.mockReturnValue(undefined);
+    getReadableScope.mockResolvedValue({ scope: TEST_SCOPE, isOwner: true });
     getMotorcycleOverview.mockResolvedValue({
       motorcycle: { currentMileage: 18501 },
       maintenanceOutlook: [],
@@ -79,8 +87,8 @@ describe("maintenance history routes", () => {
       definitions: [definition],
       records: [record],
     });
-    expect(repository.listMaintenanceRecords).toHaveBeenCalledWith("gs750");
-    expect(repository.listActiveMaintenanceDefinitions).toHaveBeenCalledWith("gs750");
+    expect(repository.listMaintenanceRecords).toHaveBeenCalledWith(TEST_SCOPE);
+    expect(repository.listActiveMaintenanceDefinitions).toHaveBeenCalledWith(TEST_SCOPE);
   });
 
   it("normalizes a linked create to the selected active definition", async () => {
@@ -97,7 +105,7 @@ describe("maintenance history routes", () => {
     );
 
     expect(response.status).toBe(201);
-    expect(repository.createMaintenanceRecord).toHaveBeenCalledWith("gs750", {
+    expect(repository.createMaintenanceRecord).toHaveBeenCalledWith(OWNER_SCOPE, {
       definitionId: definition.id,
       serviceType: definition.name,
       performedMileage: 18500,
@@ -122,7 +130,7 @@ describe("maintenance history routes", () => {
     );
 
     expect(response.status).toBe(201);
-    expect(repository.createMaintenanceRecord).toHaveBeenCalledWith("gs750", {
+    expect(repository.createMaintenanceRecord).toHaveBeenCalledWith(OWNER_SCOPE, {
       definitionId: null,
       serviceType: "Repaired loose mirror",
       performedMileage: 18000,
@@ -152,10 +160,10 @@ describe("maintenance history routes", () => {
 
     expect(updateResponse.status).toBe(200);
     expect(deleteResponse.status).toBe(200);
-    expect(repository.updateMaintenanceRecord).toHaveBeenCalledWith("gs750", record.id, {
+    expect(repository.updateMaintenanceRecord).toHaveBeenCalledWith(OWNER_SCOPE, record.id, {
       notes: "Updated",
     });
-    expect(repository.deleteMaintenanceRecord).toHaveBeenCalledWith("gs750", record.id);
+    expect(repository.deleteMaintenanceRecord).toHaveBeenCalledWith(OWNER_SCOPE, record.id);
     await expect(deleteResponse.json()).resolves.toEqual({ deletedId: record.id });
   });
 
@@ -173,7 +181,7 @@ describe("maintenance history routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(repository.updateMaintenanceRecord).toHaveBeenCalledWith("gs750", record.id, {
+    expect(repository.updateMaintenanceRecord).toHaveBeenCalledWith(OWNER_SCOPE, record.id, {
       definitionId: definition.id,
       serviceType: definition.name,
     });

@@ -1,20 +1,22 @@
-import { NextResponse } from "next/server";
-
 import { manualRepository } from "@/lib/data/manual-repository";
-import { MOTORCYCLE_ID } from "@/lib/data/motorcycle-repository";
 import { manualStorage } from "@/lib/manual/manual-storage";
 import { manualApiError } from "@/lib/manual/manual-api-error";
 import { errorResponse } from "@/lib/server/api-response";
 import { AppError } from "@/lib/server/errors";
+import type { DataScope } from "@/lib/server/data-scope";
+import { enforcePublicRateLimit } from "@/lib/server/public-rate-limit";
+import { getReadableScope } from "@/lib/server/read-access";
 
 export const runtime = "nodejs";
 
 function parseRange(rangeHeader: string | null, length: number): { start: number; end: number } | null {
-  if (!rangeHeader || !rangeHeader.startsWith("bytes=") || length < 1) {
+  if (!rangeHeader || rangeHeader.length > 256 || !rangeHeader.startsWith("bytes=") || length < 1) {
     return null;
   }
 
-  const range = rangeHeader.slice("bytes=".length).split(",", 1)[0]?.trim();
+  const ranges = rangeHeader.slice("bytes=".length).split(",");
+  if (ranges.length !== 1) return null;
+  const range = ranges[0]?.trim();
   const match = range?.match(/^(\d*)-(\d*)$/);
   if (!match) {
     return null;
@@ -49,8 +51,8 @@ function parseRange(rangeHeader: string | null, length: number): { start: number
   return { start, end: Math.min(requestedEnd, length - 1) };
 }
 
-async function getManualBytes(): Promise<Buffer> {
-  const manual = await manualRepository.findCurrent(MOTORCYCLE_ID);
+async function getManualBytes(scope: DataScope): Promise<Buffer> {
+  const manual = await manualRepository.findCurrent(scope);
   if (!manual) {
     throw new AppError(
       "MANUAL_NOT_FOUND",
@@ -79,10 +81,17 @@ function responseBody(bytes: Buffer): ArrayBuffer {
   return new Uint8Array(bytes).buffer as ArrayBuffer;
 }
 
-export async function HEAD() {
+export async function HEAD(request = new Request("http://localhost/api/manual/file", { method: "HEAD" })) {
   try {
-    const bytes = await getManualBytes();
-    return new Response(null, { status: 200, headers: buildPdfHeaders(bytes.byteLength) });
+    const access = await getReadableScope();
+    if (!access.isOwner) {
+      await enforcePublicRateLimit(request, "manual_pdf");
+    }
+    const { scope } = access;
+    const bytes = await getManualBytes(scope);
+    const headers = buildPdfHeaders(bytes.byteLength);
+    headers.set("Cache-Control", "no-store, max-age=0");
+    return new Response(null, { status: 200, headers });
   } catch (error) {
     return errorResponse(manualApiError(error));
   }
@@ -90,9 +99,15 @@ export async function HEAD() {
 
 export async function GET(request = new Request("http://localhost/api/manual/file")) {
   try {
-    const bytes = await getManualBytes();
+    const access = await getReadableScope();
+    if (!access.isOwner) {
+      await enforcePublicRateLimit(request, "manual_pdf");
+    }
+    const { scope } = access;
+    const bytes = await getManualBytes(scope);
     const range = parseRange(request.headers.get("range"), bytes.byteLength);
     const headers = buildPdfHeaders(bytes.byteLength);
+    headers.set("Cache-Control", "no-store, max-age=0");
 
     if (request.headers.has("range") && !range) {
       headers.set("Content-Range", `bytes */${bytes.byteLength}`);

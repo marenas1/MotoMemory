@@ -8,6 +8,7 @@ import type {
   PdfPageImage,
   PdfReader,
 } from "@/lib/manual/manual-types";
+import { TEST_SCOPE } from "@/tests/fixtures/test-scope";
 
 const pdfBytes = new TextEncoder().encode("%PDF-1.7\nmanual test bytes\n%%EOF");
 
@@ -86,7 +87,7 @@ describe("manual upload boundary", () => {
 
     const record = await uploadManualDocument(
       {
-        motorcycleId: "gs750",
+        scope: TEST_SCOPE,
         fileName: "gs750-manual.pdf",
         contentType: "application/pdf",
         bytes: pdfBytes,
@@ -117,7 +118,7 @@ describe("manual upload boundary", () => {
     await expect(
       uploadManualDocument(
         {
-          motorcycleId: "gs750",
+          scope: TEST_SCOPE,
           fileName: "duplicate.pdf",
           contentType: "application/pdf",
           bytes: pdfBytes,
@@ -138,7 +139,7 @@ describe("manual upload boundary", () => {
     await expect(
       uploadManualDocument(
         {
-          motorcycleId: "gs750",
+          scope: TEST_SCOPE,
           fileName: "replacement.pdf",
           contentType: "application/pdf",
           bytes: pdfBytes,
@@ -156,7 +157,7 @@ describe("manual upload boundary", () => {
     await expect(
       uploadManualDocument(
         {
-          motorcycleId: "gs750",
+          scope: TEST_SCOPE,
           fileName: "not-a-manual.pdf",
           contentType: "application/pdf",
           bytes: new TextEncoder().encode("plain text"),
@@ -174,7 +175,7 @@ describe("manual upload boundary", () => {
     await expect(
       uploadManualDocument(
         {
-          motorcycleId: "gs750",
+          scope: TEST_SCOPE,
           fileName: "too-long.pdf",
           contentType: "application/pdf",
           bytes: pdfBytes,

@@ -5,8 +5,10 @@ type NavigationItem = "dashboard" | "manual" | "history";
 
 export function MotorcycleNavigation({
   active,
+  canManage = false,
 }: {
   active: NavigationItem;
+  canManage?: boolean;
 }) {
   return (
     <aside className="side-rail" aria-label="MotoMemory navigation">
@@ -57,6 +59,7 @@ export function MotorcycleNavigation({
       </nav>
 
       <div className="rail-spacer" />
+      <span className="scope-label">{canManage ? "Local owner mode" : "Read-only deployment"}</span>
     </aside>
   );
 }

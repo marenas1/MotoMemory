@@ -13,7 +13,11 @@ export function manualApiError(error: unknown): AppError {
   }
 
   if (error instanceof ManualStorageError) {
-    return new AppError("STORAGE_UNAVAILABLE", error.message, error.status);
+    return new AppError(
+      "STORAGE_UNAVAILABLE",
+      "The private manual storage is unavailable right now.",
+      error.status,
+    );
   }
 
   if (error instanceof ManualPersistenceError) {

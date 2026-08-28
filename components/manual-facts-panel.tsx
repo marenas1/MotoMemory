@@ -12,7 +12,7 @@ import type {
 } from "@/lib/manual/manual-types";
 
 interface ApiErrorPayload {
-  error?: { message?: string };
+  error?: { code?: string; message?: string };
 }
 
 function apiErrorMessage(payload: unknown, fallback: string): string {
@@ -138,8 +138,10 @@ function FactCorrectionForm({
 
 export function ManualFactsPanel({
   manual,
+  readOnly = true,
 }: {
   manual: PublicManualDocumentRecord;
+  readOnly?: boolean;
 }) {
   const [facts, setFacts] = useState<ManualMaintenanceFactRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -223,7 +225,10 @@ export function ManualFactsPanel({
         </div>
       </div>
       <div id="manual-facts-content" hidden={!factsExpanded}>
-        <p className="muted-copy">Facts are active immediately. Use the source link and raw OCR context to double-check an ambiguous value, then correct it directly.</p>
+        <p className="muted-copy">
+          Facts are active immediately. Use the source link and raw OCR context to double-check an ambiguous value.
+          {readOnly ? " Corrections are available from the private local owner application." : " Correct facts directly when needed."}
+        </p>
         {loading ? <p className="muted-copy" role="status">Loading extracted facts…</p> : null}
         {error ? <p className="state-feedback state-feedback-error" role="alert">{error}</p> : null}
         {message ? <p className="state-feedback state-feedback-success" role="status">{message}</p> : null}
@@ -248,7 +253,7 @@ export function ManualFactsPanel({
                 <pre>{fact.rawOcrContext ?? "Not available"}</pre>
               </details>
               {fact.notes ? <p className="manual-fact-note">Note: {fact.notes}</p> : null}
-              {editingId === fact.id ? (
+              {readOnly ? null : editingId === fact.id ? (
                 <FactCorrectionForm
                   fact={fact}
                   onCancel={() => setEditingId(null)}

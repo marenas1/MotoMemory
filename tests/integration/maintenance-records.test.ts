@@ -13,8 +13,9 @@ vi.mock("pg", () => ({
 }));
 
 import { maintenanceRepository } from "@/lib/data/maintenance-repository";
+import { TEST_SCOPE } from "@/tests/fixtures/test-scope";
 
-const motorcycleId = "gs750";
+const motorcycleId = TEST_SCOPE.motorcycleId;
 const recordId = "123e4567-e89b-12d3-a456-426614174000";
 const definitionId = "223e4567-e89b-12d3-a456-426614174000";
 
@@ -83,7 +84,7 @@ describe("maintenance record repository boundary", () => {
     database.query.mockResolvedValue({ rows: [row] });
 
     await expect(
-      maintenanceRepository.listMaintenanceRecords(motorcycleId),
+      maintenanceRepository.listMaintenanceRecords(TEST_SCOPE),
     ).resolves.toMatchObject([{ id: recordId, motorcycleId }]);
 
     expect(database.query).toHaveBeenCalledWith(
@@ -94,7 +95,7 @@ describe("maintenance record repository boundary", () => {
 
   it("creates, updates, and deletes a valid record through scoped SQL", async () => {
     await expect(
-      maintenanceRepository.createMaintenanceRecord(motorcycleId, {
+      maintenanceRepository.createMaintenanceRecord(TEST_SCOPE, {
         definitionId,
         serviceType: "Oil change",
         performedMileage: 18_501,
@@ -102,7 +103,7 @@ describe("maintenance record repository boundary", () => {
     ).resolves.toMatchObject({ id: recordId, motorcycleId });
 
     await expect(
-      maintenanceRepository.updateMaintenanceRecord(motorcycleId, recordId, {
+      maintenanceRepository.updateMaintenanceRecord(TEST_SCOPE, recordId, {
         notes: "Updated note",
       }),
     ).resolves.toMatchObject({ id: recordId, motorcycleId });
@@ -114,7 +115,7 @@ describe("maintenance record repository boundary", () => {
       return { rows: [] };
     });
     await expect(
-      maintenanceRepository.deleteMaintenanceRecord(motorcycleId, recordId),
+      maintenanceRepository.deleteMaintenanceRecord(TEST_SCOPE, recordId),
     ).resolves.toBeUndefined();
 
     expect(client.query).toHaveBeenCalledWith(
@@ -125,7 +126,7 @@ describe("maintenance record repository boundary", () => {
 
   it("rejects a record above current mileage before insert", async () => {
     await expect(
-      maintenanceRepository.createMaintenanceRecord(motorcycleId, {
+      maintenanceRepository.createMaintenanceRecord(TEST_SCOPE, {
         serviceType: "Oil change",
         performedMileage: 18_502,
       }),
@@ -144,7 +145,7 @@ describe("maintenance record repository boundary", () => {
 
   it("rejects an update above current mileage before updating", async () => {
     await expect(
-      maintenanceRepository.updateMaintenanceRecord(motorcycleId, recordId, {
+      maintenanceRepository.updateMaintenanceRecord(TEST_SCOPE, recordId, {
         performedMileage: 18_502,
       }),
     ).rejects.toMatchObject({
@@ -181,13 +182,13 @@ describe("maintenance record repository boundary", () => {
     });
 
     await expect(
-      maintenanceRepository.updateMaintenanceRecord(motorcycleId, recordId, {
+      maintenanceRepository.updateMaintenanceRecord(TEST_SCOPE, recordId, {
         notes: "Must not cross scope",
       }),
     ).rejects.toMatchObject({ code: "MAINTENANCE_RECORD_NOT_FOUND" });
 
     await expect(
-      maintenanceRepository.deleteMaintenanceRecord(motorcycleId, recordId),
+      maintenanceRepository.deleteMaintenanceRecord(TEST_SCOPE, recordId),
     ).rejects.toMatchObject({ code: "MAINTENANCE_RECORD_NOT_FOUND" });
 
     const recordReads = client.query.mock.calls.filter(([query]) =>

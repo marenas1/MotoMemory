@@ -6,6 +6,7 @@ import {
 } from "@/lib/data/manual-repository";
 import type { ManualChunkRecord } from "@/lib/manual/manual-types";
 import { AppError } from "@/lib/server/errors";
+import type { DataScope } from "@/lib/server/data-scope";
 
 export const DEFAULT_MANUAL_SEARCH_LIMIT = 8;
 export const MAX_MANUAL_SEARCH_LIMIT = 20;
@@ -52,12 +53,14 @@ function validateSearchLimit(limit: number): number {
 }
 
 export async function searchManualChunks(
+  scope: DataScope,
   manualId: string,
   query: string,
   dependencies: ManualSearchDependencies = { repository: manualRepository },
   limit = DEFAULT_MANUAL_SEARCH_LIMIT,
 ): Promise<ManualChunkRecord[]> {
   return dependencies.repository.searchChunks(
+    scope,
     manualId,
     validateSearchQuery(query),
     validateSearchLimit(limit),

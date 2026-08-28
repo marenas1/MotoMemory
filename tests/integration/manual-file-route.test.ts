@@ -22,6 +22,8 @@ const { findCurrent, get } = vi.hoisted(() => ({
   findCurrent: vi.fn(),
   get: vi.fn(),
 }));
+const { getReadableScope } = vi.hoisted(() => ({ getReadableScope: vi.fn() }));
+const { enforcePublicRateLimit } = vi.hoisted(() => ({ enforcePublicRateLimit: vi.fn() }));
 
 vi.mock("@/lib/data/manual-repository", () => ({
   manualRepository: { findCurrent },
@@ -29,12 +31,23 @@ vi.mock("@/lib/data/manual-repository", () => ({
 vi.mock("@/lib/manual/manual-storage", () => ({
   manualStorage: { get },
 }));
+vi.mock("@/lib/server/read-access", () => ({ getReadableScope }));
+vi.mock("@/lib/server/public-rate-limit", () => ({ enforcePublicRateLimit }));
+
+import { TEST_SCOPE } from "@/tests/fixtures/test-scope";
 
 import { GET, HEAD } from "@/app/api/manual/file/route";
 
-describe("private manual file route", () => {
+describe("live manual file route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getReadableScope.mockResolvedValue({ scope: TEST_SCOPE, isOwner: false });
+    enforcePublicRateLimit.mockResolvedValue({
+      allowed: true,
+      retryAfterSeconds: 0,
+      throttled: false,
+      requestCount: 1,
+    });
     findCurrent.mockResolvedValue(manual);
     get.mockResolvedValue({
       bytes: new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55]),
@@ -50,13 +63,17 @@ describe("private manual file route", () => {
     expect(response.headers.get("content-disposition")).toBe(
       'inline; filename="manual.pdf"',
     );
-    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
     expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
     expect(await response.arrayBuffer()).toEqual(
       new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55]).buffer,
     );
     expect(get).toHaveBeenCalledWith(manual.storageKey);
     expect(JSON.stringify(response.headers)).not.toContain("supabase");
+    expect(enforcePublicRateLimit).toHaveBeenCalledWith(
+      expect.any(Request),
+      "manual_pdf",
+    );
   });
 
   it("supports a native PDF range request while keeping the route private", async () => {
@@ -80,6 +97,19 @@ describe("private manual file route", () => {
     expect(response.headers.get("content-type")).toBe("application/pdf");
     expect(response.headers.get("content-length")).toBe("8");
     expect(await response.text()).toBe("");
+    expect(enforcePublicRateLimit).toHaveBeenCalledWith(
+      expect.any(Request),
+      "manual_pdf",
+    );
+  });
+
+  it("does not rate-limit the private local owner process", async () => {
+    getReadableScope.mockResolvedValue({ scope: TEST_SCOPE, isOwner: true });
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(enforcePublicRateLimit).not.toHaveBeenCalled();
   });
 
   it("does not render a viewer response when no manual exists", async () => {
